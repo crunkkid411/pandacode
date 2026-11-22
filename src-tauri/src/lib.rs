@@ -4072,6 +4072,13 @@ pub fn run() {
                     hub::hub_running_now,
                     hub::hub_task_run_now,
                     hub::hub_task_set_enabled,
+                    // Chats panel: PandaCode's own chat commands, the same ones its main window uses.
+                    list_sessions,
+                    list_providers,
+                    get_messages,
+                    send_message,
+                    stop_session,
+                    chats::chat_create,
                 ];
                 return handler(invoke);
             }

@@ -37,3 +37,23 @@ test('gigabytes: one decimal under 10, whole above', () => {
   assert.equal(gb(6011), '5.9');
   assert.equal(gb(14210), '14');
 });
+
+import { chatState, speaker, visibleChats } from '../src/hub/chats-facts.ts';
+
+test('chat states: working, needs you, failed, idle', () => {
+  assert.equal(chatState('running'), 'working');
+  assert.equal(chatState('waiting_approval'), 'needs-you');
+  assert.equal(chatState('limited'), 'needs-you');
+  assert.equal(chatState('failed'), 'failed');
+  assert.equal(chatState('interrupted'), 'failed');
+  assert.equal(chatState('idle'), 'idle');
+  assert.equal(chatState('completed'), 'idle');
+});
+
+test('chats: newest activity first, no drafts or archived', () => {
+  const c = (id, at, extra = {}) => ({ id, title: id, provider: 'claude', model: 'default', status: 'idle', archived: false, createdAt: 1, updatedAt: 1, lastResponseAt: at, ...extra });
+  assert.deepEqual(visibleChats([c('old', 10), c('new', 30), c('mid', 20), c('gone', 99, { archived: true }), c('draft', 98, { draft: true })]).map(x => x.id), ['new', 'mid', 'old']);
+  assert.equal(speaker('user'), 'me');
+  assert.equal(speaker('assistant'), 'agent');
+  assert.equal(speaker('changes'), 'note');
+});

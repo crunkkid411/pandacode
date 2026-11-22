@@ -1020,7 +1020,8 @@ export async function invoke<T>(command: string, args: Record<string, any>): Pro
     send: async (sessionId, text) => { await invoke('send_message', { sessionId, text }); },
   });
   if (command.startsWith('tray_')) return trayCommand(command, args) as T;
-  if (command.startsWith('hub_')) return (await import('./preview-hub')).invokeHub<T>(command, args);
+  // The Hub window answers every call from its own preview, so its page tests never depend on the main window's sample data.
+  if (command.startsWith('hub_') || location.pathname.endsWith('/hub.html')) return (await import('./preview-hub')).invokeHub<T>(command, args);
   // An if chain, not a switch: specs patch the first command switch in this file to record calls.
   if (command.startsWith('agents_dock_')) return previewAgentsDock<T>(command, args);
   if (command.startsWith('jj_')) return (await import('./preview-jj')).invokeJj<T>(command, args);

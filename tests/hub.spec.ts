@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows one panel, Running now, and only panels that are built', async ({ page }) => {
+test('the Hub shows two panels, Running now first, and only panels that are built', async ({ page }) => {
   await page.goto('/hub.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(1);
+  await expect(nav.getByRole('button')).toHaveCount(2);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -77,4 +77,52 @@ test('other apps\' tasks sit in a closed fold below his own, and still work', as
   await page.getByText('Other apps').click();
   await others.getByRole('button', { name: 'Run AppleSoftwareUpdate now' }).click();
   await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\AppleSoftwareUpdate']);
+});
+
+const openChats = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click(); };
+const chatRow = (page: Page, name: string) => page.getByRole('list', { name: 'Chats' }).getByRole('listitem').filter({ hasText: name });
+
+test('chats: archived chats are hidden, newest first, one button per installed agent', async ({ page }) => {
+  await openChats(page);
+  await expect(page.getByRole('list', { name: 'Chats' }).getByRole('listitem')).toHaveText([/Write the shorts captions/, /Fix the playlist scout/]);
+  await expect(page.getByRole('button', { name: 'Claude Code' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'OpenCode' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cursor' })).toHaveCount(0);
+});
+
+test('chats: Send sends the exact text to that chat, and the answer shows', async ({ page }) => {
+  await openChats(page);
+  await chatRow(page, 'Fix the playlist scout').click();
+  await expect(page.getByRole('list', { name: 'Messages' })).toContainText('It ran Qwen3.5-4B');
+  await page.getByRole('textbox', { name: 'Message' }).fill('Use LFM3 instead');
+  await page.getByRole('textbox', { name: 'Message' }).press('Enter');
+  await expect.poll(async () => (await calls(page, 'send_message')).map(c => c.args)).toEqual([{ sessionId: 'c1', text: 'Use LFM3 instead' }]);
+  await expect(page.getByRole('list', { name: 'Messages' })).toContainText('Done: Use LFM3 instead');
+});
+
+test('chats: a new chat button creates a chat for that agent and opens it', async ({ page }) => {
+  await openChats(page);
+  await page.getByRole('button', { name: 'OpenCode' }).click();
+  await expect.poll(async () => (await calls(page, 'chat_create')).map(c => c.args)).toEqual([{ provider: 'opencode', model: 'default', mode: 'full' }]);
+  await expect(page.getByRole('heading', { name: 'New chat' })).toBeVisible();
+});
+
+test('chats: Stop on a working chat sends stop_session for that chat', async ({ page }) => {
+  await openChats(page);
+  await chatRow(page, 'Write the shorts captions').click();
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args)).toEqual([{ sessionId: 'c2' }]);
+  await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+});
+
+test('chats: ctrl and shift select several; Stop all stops only the working ones', async ({ page }) => {
+  await openChats(page);
+  await chatRow(page, 'Write the shorts captions').click();
+  await chatRow(page, 'Fix the playlist scout').click({ modifiers: ['Shift'] });
+  await expect(page.getByRole('toolbar', { name: 'Selected chats' })).toContainText('2');
+  await chatRow(page, 'Fix the playlist scout').click({ modifiers: ['Control'] });
+  await expect(page.getByRole('toolbar', { name: 'Selected chats' })).toHaveCount(0);
+  await chatRow(page, 'Fix the playlist scout').click({ modifiers: ['Control'] });
+  await page.getByRole('button', { name: 'Stop all' }).click();
+  await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args)).toEqual([{ sessionId: 'c2' }]);
 });

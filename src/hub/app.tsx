@@ -1,9 +1,13 @@
-import { Activity } from 'lucide-react';
+import { Activity, MessagesSquare } from 'lucide-react';
 import { useState } from 'react';
+import { Chats } from './chats';
 import { RunningNow } from './running-now';
 
 // One entry per panel that is really built. A panel with no backend is not drawn (JOBS.md J10).
-const PANELS = [{ id: 'running-now', label: 'Running now', icon: Activity, view: RunningNow }] as const;
+const PANELS = [
+  { id: 'running-now', label: 'Running now', icon: Activity, view: RunningNow },
+  { id: 'chats', label: 'Chats', icon: MessagesSquare, view: Chats },
+] as const;
 
 export function App() {
   const [active, setActive] = useState<(typeof PANELS)[number]['id']>('running-now');
@@ -25,7 +29,7 @@ export function App() {
           </button>
         ))}
       </nav>
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <main className={`min-w-0 flex-1 ${active === 'chats' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         <Panel />
       </main>
     </div>
