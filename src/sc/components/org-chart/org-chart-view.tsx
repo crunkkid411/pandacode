@@ -71,7 +71,8 @@ export function OrgChartView() {
   }, [sessions])
 
   // Build tree
-  const { roots, unattached } = useMemo(() => buildOrgTree(agents), [agents])
+  // Hub: idle PandaCode chats have no org place; leave them off the chart instead of in "unattached".
+  const { roots, unattached } = useMemo(() => buildOrgTree(Object.fromEntries(Object.entries(agents).filter(([, a]) => a.orgChart))), [agents])
 
   // Layout positions — use saved positions or auto-layout
   const positions = useMemo(() => {

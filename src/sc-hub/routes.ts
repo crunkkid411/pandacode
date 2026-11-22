@@ -1,6 +1,7 @@
 // What each SwarmClaw API path means on Jordan's PC. Every answer comes from a Hub Rust command.
 import type { Agent, ProviderInfo, Skill } from '../sc/types';
 import { work, type Ledger } from '../hub/usage-facts';
+import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 interface Ctx { call: Call; match: RegExpMatchArray; query: URLSearchParams; body: unknown }
@@ -19,9 +20,10 @@ function agent(id: string, name: string, description: string, extra: Partial<Age
 /** Jordan on top, every Claude Code session running now under him, each session's helpers under it,
  *  and every other agent program that is running. */
 export async function orgAgents(call: Call): Promise<Record<string, Agent>> {
-  const [sessions, now] = await Promise.all([
+  const [sessions, now, chats] = await Promise.all([
     call<OrgSession[]>('hub_org'),
     call<{ processes: Proc[] }>('hub_running_now').catch(() => ({ processes: [] as Proc[] })),
+    pcChats(call).catch(() => [] as Chat[]),
   ]);
   const out: Record<string, Agent> = {
     jordan: agent('jordan', 'Jordan', 'You', { role: 'coordinator', emoji: '👑', orgChart: { parentId: null } }),
@@ -50,7 +52,87 @@ export async function orgAgents(call: Call): Promise<Record<string, Agent>> {
       emoji: '🟢', orgChart: { parentId: 'jordan', teamLabel: 'Other agents', teamColor: '#34d399' }, createdAt: p.startedMs, updatedAt: p.startedMs,
     });
   }
+  const pinned = new Set(saved().pinned);
+  for (const c of chats) out[`chat-${c.id}`] = { ...chatAgent(c), pinned: pinned.has(`chat-${c.id}`) };
   return out;
+}
+
+// ---- PandaCode chats as SwarmClaw agents (Agents page = chat with each one) ----
+interface PcMessage { id: number; role: string; content: string; createdAt: number }
+
+/** PandaCode chats, newest first; archived and draft chats left out. */
+const pcChats = async (call: Call) => visibleChats(await call<Chat[]>('list_sessions'));
+
+function chatSession(c: Chat) {
+  return { id: c.id, name: c.title || 'New chat', cwd: '', user: 'Jordan', provider: c.provider, model: c.model, claudeSessionId: null,
+    messages: [], agentId: `chat-${c.id}`, createdAt: c.createdAt, updatedAt: c.updatedAt,
+    lastActiveAt: Math.max(c.lastResponseAt ?? 0, c.lastPromptAt ?? 0, c.updatedAt), active: chatState(c.status) === 'working' };
+}
+
+function chatAgent(c: Chat): Agent {
+  const live = chatState(c.status) !== 'idle';
+  return agent(`chat-${c.id}`, c.title || 'New chat', `${NAMES[c.provider] ?? c.provider} · ${c.model}`, {
+    provider: c.provider as Agent['provider'], model: c.model, threadSessionId: c.id,
+    // Only chats that are working or waiting go on the Org Chart; the rest stay on the Agents page.
+    ...(live ? { orgChart: { parentId: 'jordan', teamLabel: 'PandaCode chats', teamColor: '#f59e0b' } } : {}),
+    createdAt: c.createdAt, updatedAt: chatSession(c).lastActiveAt,
+  });
+}
+
+/** PandaCode's message rows in SwarmClaw's shape. Errors show as the agent's reply with a warning sign. */
+// ponytail: tool and system rows are left out; add them as SwarmClaw toolEvents if he wants to see them.
+const toMessages = (rows: PcMessage[]) => rows.flatMap(m =>
+  m.role === 'user' || m.role === 'assistant' ? [{ role: m.role, text: m.content, time: m.createdAt, kind: 'chat' }]
+    : m.role === 'error' ? [{ role: 'assistant', text: `⚠️ ${m.content}`, time: m.createdAt, kind: 'chat' }] : []);
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** Sends one message to a PandaCode chat and streams the reply back in SwarmClaw's "data: {...}" format.
+ *  PandaCode writes replies to its store, so this re-reads the chat every 1.5 s until it stops working. */
+export function chatStream(call: Call, id: string, text: string, pollMs = 1500): Response {
+  const enc = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(out) {
+      const send = (e: Record<string, unknown>) => out.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
+      try {
+        const before = (await call<{ messages: PcMessage[] }>('get_messages', { sessionId: id })).messages.at(-1)?.id ?? 0;
+        await call('send_message', { sessionId: id, text });
+        const started = Date.now();
+        let shown = '', errors = 0, sawWork = false;
+        while (Date.now() - started < 60 * 60_000) {
+          await sleep(pollMs);
+          const [page, chats] = await Promise.all([call<{ messages: PcMessage[] }>('get_messages', { sessionId: id }), call<Chat[]>('list_sessions')]);
+          const fresh = page.messages.filter(m => m.id > before);
+          const reply = fresh.filter(m => m.role === 'assistant').map(m => m.content).join('\n\n');
+          if (reply !== shown) { shown = reply; send({ t: 'r', text: reply }); }
+          for (const e of fresh.filter(m => m.role === 'error').slice(errors)) send({ t: 'err', text: e.content });
+          errors = fresh.filter(m => m.role === 'error').length;
+          const state = chatState(chats.find(c => c.id === id)?.status ?? '');
+          if (state === 'working') { sawWork = true; continue; }
+          if (state === 'needs-you') { send({ t: 'err', text: 'This chat is waiting for you. Open it in PandaCode to answer.' }); break; }
+          // Done once it has worked and stopped, or answered, or never started within 15 s.
+          if (sawWork || reply || errors || Date.now() - started > 15_000) break;
+        }
+      } catch (e) {
+        send({ t: 'err', text: String(e) });
+      }
+      send({ t: 'done' });
+      out.close();
+    },
+  });
+  return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+async function chatMessages(call: Call, id: string, limit: string | null) {
+  const messages = toMessages((await call<{ messages: PcMessage[] }>('get_messages', { sessionId: id })).messages);
+  // ponytail: only PandaCode's newest page; older messages need paging with before_id.
+  return limit ? { messages, total: messages.length, hasMore: false, startIndex: 0 } : messages;
+}
+
+async function oneChat(call: Call, id: string) {
+  const c = (await call<Chat[]>('list_sessions')).find(x => x.id === id);
+  if (!c) throw new Error('That chat no longer exists in PandaCode.');
+  return chatSession(c);
 }
 
 interface HubSkill { kind: string; name: string; description: string; places: string[]; path: string; ours: boolean }
@@ -139,7 +221,53 @@ const pathOf = (id: string) => {
   return path;
 };
 
+// ---- Small per-window choices (default chat, pinned chats): kept in this window's own storage ----
+// ponytail: localStorage, fine for one person on one PC; move to a Rust file if the phone needs them.
+const KEY = 'hub.swarmclaw.v1';
+interface Saved { settings: Record<string, unknown>; pinned: string[] }
+function saved(): Saved {
+  try { return { settings: {}, pinned: [], ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return { settings: {}, pinned: [] }; }
+}
+function save(next: Saved) { try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* the choice just won't stick */ } }
+const BASE_SETTINGS = { userName: 'Jordan', setupCompleted: true };
+
 export const routes: Route[] = [
+  { method: 'PUT', path: /^\/settings$/, run: async ({ body }) => {
+    const s = saved();
+    // Only choices that change what Jordan sees here; anything else SwarmClaw sends is ignored.
+    const b = (body ?? {}) as { defaultAgentId?: string | null };
+    if ('defaultAgentId' in b) s.settings.defaultAgentId = b.defaultAgentId ?? null;
+    save(s);
+    return { ...BASE_SETTINGS, ...s.settings };
+  } },
+  { method: 'PUT', path: /^\/agents\/([^/]+)$/, run: async ({ match, body }) => {
+    const b = (body ?? {}) as { pinned?: boolean };
+    if (typeof b.pinned !== 'boolean') throw new Error('Only pinning is supported here.');
+    const s = saved();
+    s.pinned = s.pinned.filter(id => id !== match[1]).concat(b.pinned ? [match[1]] : []);
+    save(s);
+    return { ok: true };
+  } },
+  { method: 'GET', path: /^\/chats$/, run: async ({ call }) => Object.fromEntries((await pcChats(call)).map(c => [c.id, chatSession(c)])) },
+  { method: 'GET', path: /^\/chats\/([^/]+)$/, run: ({ call, match }) => oneChat(call, match[1]) },
+  { method: 'GET', path: /^\/chats\/([^/]+)\/messages$/, run: ({ call, match, query }) => chatMessages(call, match[1], query.get('limit')) },
+  { method: 'POST', path: /^\/chats\/([^/]+)\/chat$/, run: async ({ call, match, body }) => chatStream(call, match[1], String((body as { message?: string } | null)?.message ?? '')) },
+  { method: 'POST', path: /^\/chats\/([^/]+)\/stop$/, run: async ({ call, match }) => { await call('stop_session', { sessionId: match[1] }); return { ok: true }; } },
+  // "New chat" in SwarmClaw's chat header: a fresh PandaCode chat with the same agent and model.
+  { method: 'POST', path: /^\/chats$/, run: async ({ call, body }) => {
+    const b = (body ?? {}) as { provider?: string; model?: string };
+    if (!b.provider) throw new Error('Pick an agent first.');
+    return chatSession(await call<Chat>('chat_create', { provider: b.provider, model: b.model || 'default', mode: 'full' }));
+  } },
+  { method: 'GET', path: /^\/chats\/([^/]+)\/context-pack$/, run: async ({ call, match }) => {
+    const c = await oneChat(call, match[1]);
+    const rows = toMessages((await call<{ messages: PcMessage[] }>('get_messages', { sessionId: match[1] })).messages);
+    return [`# ${c.name}`, ...rows.map(m => `**${m.role === 'user' ? 'Jordan' : c.name}:** ${m.text}`)].join('\n\n');
+  } },
+  // PandaCode has no message queue or context meter to show: an empty queue, and null hides the meter.
+  { method: 'GET', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ match }) => ({ sessionId: match[1], activeRunId: null, queueLength: 0, items: [] }) },
+  { method: 'GET', path: /^\/chats\/([^/]+)\/context-status$/, run: async () => null },
+  { method: 'POST', path: /^\/agents\/chat-([^/]+)\/thread$/, run: ({ call, match }) => oneChat(call, match[1]) },
   { method: 'GET', path: /^\/schedules$/, run: ({ call }) => schedules(call) },
   { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => { await call('hub_task_run_now', { path: pathOf(match[1]) }); return { ok: true, queued: true }; } },
   { method: 'PUT', path: /^\/schedules\/([^/]+)$/, run: async ({ call, match, body }) => {
@@ -150,7 +278,7 @@ export const routes: Route[] = [
   } },
   { method: 'GET', path: /^\/auth$/, run: async () => ({ authenticated: true }) },
   { method: 'POST', path: /^\/auth$/, run: async () => ({ ok: true }) },
-  { method: 'GET', path: /^\/settings$/, run: async () => ({ userName: 'Jordan', setupCompleted: true }) },
+  { method: 'GET', path: /^\/settings$/, run: async () => ({ ...BASE_SETTINGS, ...saved().settings }) },
   { method: 'GET', path: /^\/credentials$/, run: async () => ({}) },
   { method: 'GET', path: /^\/agents$/, run: ({ call }) => orgAgents(call) },
   { method: 'GET', path: /^\/skills$/, run: ({ call }) => skills(call) },

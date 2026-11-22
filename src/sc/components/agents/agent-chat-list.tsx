@@ -110,6 +110,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
   const sortedAgents = useMemo(() => {
     return Object.values(agents)
       .filter((a) => {
+        if (!a.threadSessionId) return false // Hub: Jordan, terminal sessions and helpers are on the Org Chart, not chats
         if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
         return true
       })
@@ -255,7 +256,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
               {f}
             </button>
           ))}
-          <button
+          {/* Hub: no Select / bulk Delete; PandaCode keeps its chats */ false && <button
             type="button"
             onClick={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()) }}
             aria-label={bulkMode ? 'Exit selection mode' : 'Select chats'}
@@ -263,7 +264,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
               ${bulkMode ? 'bg-accent-soft text-accent-bright' : 'bg-transparent text-text-3 hover:text-text-2 hover:bg-white/[0.04]'}`}
           >
             {bulkMode ? 'Cancel' : 'Select'}
-          </button>
+          </button>}
         </div>
       )}
       {/* Bulk action bar */}

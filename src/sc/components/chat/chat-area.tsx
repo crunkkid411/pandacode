@@ -751,12 +751,7 @@ export function ChatArea() {
         }}>
           {debugOpen ? 'Hide Debug Panel' : 'Show Debug Panel'}
         </DropdownItem>
-        <DropdownItem onClick={() => { setMenuOpen(false); setConfirmClear(true) }}>
-          Clear History
-        </DropdownItem>
-        <DropdownItem danger onClick={() => { setMenuOpen(false); setConfirmDelete(true) }}>
-          Delete Chat
-        </DropdownItem>
+        {/* Hub: Clear History and Delete Chat left out; PandaCode keeps its chats */}
       </Dropdown>
 
       <ConfirmDialog

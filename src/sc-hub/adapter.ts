@@ -14,7 +14,10 @@ export async function answer(method: string, path: string, body: unknown): Promi
     if (r.method !== method) continue;
     const m = bare.match(r.path);
     if (m) {
-      try { return json(await r.run({ call, match: m, query: new URLSearchParams(qs), body })); }
+      try {
+        const out = await r.run({ call, match: m, query: new URLSearchParams(qs), body });
+        return out instanceof Response ? out : json(out); // a Response is a live stream (chat replies)
+      }
       catch (e) { return json({ error: String(e) }, 500); }
     }
   }

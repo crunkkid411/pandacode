@@ -65,3 +65,38 @@ test('schedules: Windows tasks show, his own first; Run Now and Pause send the r
   await expect.poll(async () => (await calls(page, 'hub_task_set_enabled')).map(c => c.args)).toEqual([{ path: '\\Becky Stars Refresh', enabled: false }]);
   await page.screenshot({ path: process.env.HUB_SHOT_DIR ? `${process.env.HUB_SHOT_DIR}/sc-schedules.png` : 'test-results/sc-schedules.png' });
 });
+
+test('agents: SwarmClaw chat lists his PandaCode chats; sending streams the real reply', async ({ page }) => {
+  await open(page, '/agents');
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/agents/chat-c2'); // newest chat opens
+  await expect(page.getByText('Fix the playlist scout').first()).toBeVisible();
+  await expect(page.getByText('Old archived chat')).toHaveCount(0);
+  await page.getByText('Fix the playlist scout').first().click();
+  await expect(page.getByText('It ran Qwen3.5-4B on the graphics card.').first()).toBeVisible();
+  const box = page.locator('textarea').first();
+  await box.fill('check the logs');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'send_message')).map(c => [c.args.sessionId, c.args.text])).toEqual([['c1', 'check the logs']]);
+  await expect(page.getByText('Done: check the logs').first()).toBeVisible();
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agents.png` });
+});
+
+test('org chart: a working PandaCode chat shows under Jordan; idle chats do not', async ({ page }) => {
+  await open(page, '/org-chart');
+  await expect(page.getByText('Write the shorts captions').first()).toBeVisible();
+  await expect(page.getByText('Fix the playlist scout')).toHaveCount(0);
+});
+
+test('agents: New chat makes a PandaCode chat with the same agent; pin sticks after reload; hollow buttons hidden', async ({ page }) => {
+  await open(page, '/agents/chat-c1');
+  await expect(page.getByText('It ran Qwen3.5-4B on the graphics card.').first()).toBeVisible();
+  for (const hollow of ['Toggle voice', 'Toggle inspector', 'Add attachment', 'Select chats']) await expect(page.getByRole('button', { name: hollow })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Chat menu' }).click();
+  await expect(page.getByText('Delete Chat')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Start a new chat session' }).click();
+  await expect.poll(async () => (await calls(page, 'chat_create')).map(c => [c.args.provider, c.args.model])).toEqual([['claude', 'default']]);
+  await page.getByRole('button', { name: 'Pin agent' }).first().click({ force: true });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Unpin agent' })).toHaveCount(1);
+});

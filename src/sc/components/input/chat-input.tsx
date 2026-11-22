@@ -364,7 +364,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
           ) : undefined}
           footer={(
             <div className="flex items-center gap-1 px-4 pb-3.5">
-              <button
+              {/* Hub: no file uploads into PandaCode chats yet */ false && <button
                 type="button"
                 onClick={() => setExtrasOpen((open) => !open)}
                 aria-label="Add attachment"
@@ -378,7 +378,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
                   <path d="M5 12h14" />
                 </svg>
                 <span className="hidden sm:inline">Add</span>
-              </button>
+              </button>}
 
               <div className="flex-1" />
 
