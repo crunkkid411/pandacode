@@ -100,16 +100,30 @@ fn quiet(program: &str) -> Command {
 }
 
 /// Runs a program and returns its stdout, killing it after `timeout`.
+/// Output is read on its own threads while we wait: `schtasks /v` prints more than a pipe
+/// holds, and a child blocked on a full pipe never exits (found 2026-11-22).
 fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<String, String> {
+    use std::io::Read;
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| e.to_string())?;
+    let drain = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
+    };
+    let out = drain(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
+    let err = drain(child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>));
     let started = Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait().map_err(|e| e.to_string())? {
-            Some(_) => break,
+            Some(status) => break status,
             None if started.elapsed() >= timeout => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -117,14 +131,13 @@ fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<String, S
             }
             None => std::thread::sleep(Duration::from_millis(25)),
         }
+    };
+    let stdout = String::from_utf8_lossy(&out.join().unwrap_or_default()).into_owned();
+    let stderr = String::from_utf8_lossy(&err.join().unwrap_or_default()).trim().to_string();
+    if !status.success() {
+        return Err(if stderr.is_empty() { stdout.trim().to_string() } else { stderr });
     }
-    let output = child.wait_with_output().map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        return Err(if err.is_empty() { out } else { err });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    Ok(stdout)
 }
 
 // ---------- graphics card ----------
