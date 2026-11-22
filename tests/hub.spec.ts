@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows seven panels, Running now first, and only panels that are built', async ({ page }) => {
-  await page.goto('/hub.html');
+test('the Hub shows eight panels, Running now first, and only panels that are built', async ({ page }) => {
+  await page.goto('/hub-classic.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(7);
+  await expect(nav.getByRole('button')).toHaveCount(8);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -17,13 +17,13 @@ test('the Hub shows seven panels, Running now first, and only panels that are bu
 });
 
 test('run now sends hub_task_run_now with that exact task path', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await row(page, 'Becky Stars Refresh').getByRole('button', { name: 'Run Becky Stars Refresh now' }).click();
   await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\Becky Stars Refresh']);
 });
 
 test('the switch sends hub_task_set_enabled and the list re-reads the new state', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   const sweep = row(page, 'Agent Branch Sweep').getByRole('switch');
   await expect(sweep).toHaveAttribute('aria-checked', 'false');
   const readsBefore = (await calls(page, 'hub_running_now')).length;
@@ -34,7 +34,7 @@ test('the switch sends hub_task_set_enabled and the list re-reads the new state'
 });
 
 test('shift-click selects a range and Run all runs each selected task once', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await row(page, 'Agent Branch Sweep').getByText('Agent Branch Sweep').click();
   await row(page, 'Becky Stars Refresh').getByText('Becky Stars Refresh').click({ modifiers: ['Shift'] });
   await expect(page.getByRole('toolbar', { name: 'Selected tasks' })).toContainText('3');
@@ -44,7 +44,7 @@ test('shift-click selects a range and Run all runs each selected task once', asy
 });
 
 test('ctrl-click adds and removes one task from the selection', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await row(page, 'Agent Branch Sweep').getByText('Agent Branch Sweep').click();
   await row(page, 'MelancholyMonitor').getByText('MelancholyMonitor').click({ modifiers: ['Control'] });
   await expect(page.getByRole('toolbar', { name: 'Selected tasks' })).toContainText('2');
@@ -53,7 +53,7 @@ test('ctrl-click adds and removes one task from the selection', async ({ page })
 });
 
 test('each task state has its own look: failed, running, worked, switched off', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await expect(row(page, 'Becky Stars Refresh').getByRole('img', { name: 'Last run failed' })).toBeVisible();
   await expect(row(page, 'MelancholyMonitor').getByRole('img', { name: 'Running now' })).toBeVisible();
   await expect(row(page, 'Becky Playlist Scout (idle)').getByRole('img', { name: 'Last run worked' })).toBeVisible();
@@ -62,14 +62,14 @@ test('each task state has its own look: failed, running, worked, switched off', 
 
 test('a graphics card that does not answer shows a red question mark, not a number', async ({ page }) => {
   await page.addInitScript(() => { (window as any).__hubNoGpu = true; });
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   const gpu = page.getByRole('group', { name: 'Graphics card', exact: true });
   await expect(gpu).toContainText('?');
   await expect(page.getByRole('group', { name: 'Graphics card heat' })).toHaveCount(0);
 });
 
 test('other apps\' tasks sit in a closed fold below his own, and still work', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   const mine = page.getByRole('list', { name: 'Scheduled tasks' });
   await expect(mine.getByRole('listitem')).toHaveCount(4);
   const others = page.getByRole('list', { name: "Other apps' tasks" });
@@ -79,7 +79,7 @@ test('other apps\' tasks sit in a closed fold below his own, and still work', as
   await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\AppleSoftwareUpdate']);
 });
 
-const openChats = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click(); };
+const openChats = async (page: Page) => { await page.goto('/hub-classic.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click(); };
 const chatRow = (page: Page, name: string) => page.getByRole('list', { name: 'Chats' }).getByRole('listitem').filter({ hasText: name });
 
 test('chats: archived chats are hidden, newest first, one button per installed agent', async ({ page }) => {
@@ -127,7 +127,7 @@ test('chats: ctrl and shift select several; Stop all stops only the working ones
   await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args)).toEqual([{ sessionId: 'c2' }]);
 });
 
-const openAgents = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agents' }).click(); };
+const openAgents = async (page: Page) => { await page.goto('/hub-classic.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agents' }).click(); };
 
 test('agents: bots and scheduled chats show with their timing', async ({ page }) => {
   await openAgents(page);
@@ -170,7 +170,7 @@ test('agents: ctrl selects two scheduled chats; Switch off turns off each', asyn
   await expect.poll(async () => (await calls(page, 'schedule_set_enabled')).map(c => c.args)).toEqual([{ scheduleId: 's1', enabled: false }, { scheduleId: 's2', enabled: false }]);
 });
 
-const openTools = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Tools' }).click(); };
+const openTools = async (page: Page) => { await page.goto('/hub-classic.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Tools' }).click(); };
 
 test('tools: Transcribe sends each picked file as its own job, one at a time', async ({ page }) => {
   await page.addInitScript(() => { (window as any).__hubPick = ['C:/Videos/a.mp4', 'C:/Videos/b.mp4']; (window as any).__hubHoldJobs = true; });
@@ -204,7 +204,7 @@ test('tools: picking nothing starts nothing', async ({ page }) => {
 });
 
 test('ask: the router picks the agent and model, and the chat starts with the words', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
   await page.getByRole('textbox', { name: 'What do you want done?' }).fill('Fix the login bug');
   await page.getByRole('button', { name: 'Ask' }).click();
@@ -219,7 +219,7 @@ test('ask: the router picks the agent and model, and the chat starts with the wo
 
 test('ask: with no rated model it still starts the first agent', async ({ page }) => {
   await page.addInitScript(() => { (window as any).__hubNoRoute = true; });
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
   await page.getByRole('textbox', { name: 'What do you want done?' }).fill('Hello');
   await page.getByRole('button', { name: 'Ask' }).click();
@@ -228,7 +228,7 @@ test('ask: with no rated model it still starts the first agent', async ({ page }
 });
 
 test('chats: an agent error shows in red with its real words; empty system lines are hidden', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
   await page.getByRole('textbox', { name: 'What do you want done?' }).fill('FAIL');
   await page.getByRole('button', { name: 'Ask' }).click();
@@ -237,7 +237,7 @@ test('chats: an agent error shows in red with its real words; empty system lines
 });
 
 test('voice: Start turns one voice on, the other waits, Stop turns it off', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Voice' }).click();
   await page.getByRole('button', { name: 'Start Talk with Gemini' }).click();
   await expect(page.getByText('On now. Talk in its window.')).toBeVisible();
@@ -250,7 +250,7 @@ test('voice: Start turns one voice on, the other waits, Stop turns it off', asyn
 
 test('providers: each agent shows if it works, why not, and what Ask may use', async ({ page }) => {
   await page.addInitScript(() => { (window as any).__hubBroken = true; });
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Providers' }).click();
   const list = page.getByRole('list', { name: 'Installed agents' });
   await expect(list.getByRole('listitem', { name: 'Claude Code' }).getByRole('img', { name: 'Works' })).toBeVisible();
@@ -264,7 +264,7 @@ test('providers: each agent shows if it works, why not, and what Ask may use', a
 });
 
 test('usage: a bar per day for two weeks, and which models did the work', async ({ page }) => {
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Usage' }).click();
   await expect(page.getByRole('region', { name: 'Work per day' }).getByRole('listitem')).toHaveCount(14);
   const models = page.getByRole('region', { name: 'Models this week' });
@@ -276,9 +276,35 @@ test('usage: a bar per day for two weeks, and which models did the work', async 
 
 test('providers: says it is looking while the agent scan runs', async ({ page }) => {
   await page.addInitScript(() => { (window as any).__hubSlowProviders = true; });
-  await page.goto('/hub.html');
+  await page.goto('/hub-classic.html');
   await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Providers' }).click();
   await expect(page.getByRole('status')).toContainText('Looking for your agents');
   await expect(page.getByRole('list', { name: 'Installed agents' }).getByRole('listitem').first()).toBeVisible();
   await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test('skills: made-for-you first, search, filters, open, and multi-select', async ({ page }) => {
+  await page.goto('/hub-classic.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Skills' }).click();
+  const rows = page.getByRole('list', { name: 'Skills list' }).getByRole('listitem');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.first()).toHaveAccessibleName('agent-firefox');
+  await page.getByRole('button', { name: /Made for you/ }).click();
+  await expect(rows).toHaveCount(2);
+  await page.getByRole('button', { name: /Made for you/ }).click();
+  const filters = page.getByRole('group', { name: 'Filters' });
+  await filters.getByRole('button', { name: 'Agents' }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('ON');
+  await filters.getByRole('button', { name: 'All' }).click();
+  await page.getByRole('textbox', { name: 'Search skills' }).fill('editing');
+  await expect(rows).toHaveCount(1);
+  await page.getByRole('button', { name: 'Open video-rules' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_open_path')).map(c => c.args)).toEqual([{ path: 'X:/AI-2/rules/SKILL.md', folder: false }]);
+  await page.getByRole('textbox', { name: 'Search skills' }).fill('');
+  await rows.nth(0).click();
+  await rows.nth(2).click({ modifiers: ['Shift'] });
+  await expect(page.getByRole('toolbar', { name: 'Selected skills' })).toContainText('3');
+  await page.getByRole('button', { name: 'Rebuild' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_skills_rebuild')).length).toBe(1);
 });

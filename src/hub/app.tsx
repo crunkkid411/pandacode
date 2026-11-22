@@ -1,9 +1,10 @@
-import { Activity, BarChart3, Bot, MessagesSquare, Mic, Plug, Wrench } from 'lucide-react';
+import { Activity, BarChart3, Bot, MessagesSquare, Mic, Plug, Sparkles, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Agents } from './agents';
 import { Chats } from './chats';
 import { RunningNow } from './running-now';
 import { Providers } from './providers';
+import { Skills } from './skills';
 import { Tools } from './tools';
 import { Usage } from './usage';
 import { Voice } from './voice';
@@ -14,6 +15,7 @@ const PANELS = [
   { id: 'chats', label: 'Chats', icon: MessagesSquare, view: Chats },
   { id: 'agents', label: 'Agents', icon: Bot, view: Agents },
   { id: 'providers', label: 'Providers', icon: Plug, view: Providers },
+  { id: 'skills', label: 'Skills', icon: Sparkles, view: Skills },
   { id: 'usage', label: 'Usage', icon: BarChart3, view: Usage },
   { id: 'tools', label: 'Tools', icon: Wrench, view: Tools },
   { id: 'voice', label: 'Voice', icon: Mic, view: Voice },

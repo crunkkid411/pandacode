@@ -613,3 +613,50 @@ mod tests {
         assert_ne!(before, after, "run-now should change Last Run Time");
     }
 }
+
+/// Jordan's visual style guide, made by an earlier agent as one HTML page (2026-11-17).
+pub(crate) const STYLE_GUIDE: &str = "file:///X:/AI-2/visual-style-menu/visual-style-menu.html";
+const STYLE_GUIDE_LABEL: &str = "style-guide";
+
+/// Only the style guide page itself and the local files it shows may load in its window.
+pub(crate) fn style_guide_may_load(url: &tauri::Url) -> bool {
+    url.scheme() == "file" || url.as_str().starts_with("data:")
+}
+
+/// Opens the style guide in its own window as a plain page (file:// so its local videos play),
+/// with no access to Hub commands. A second click focuses the open one.
+#[tauri::command]
+pub async fn hub_open_style_guide(app: AppHandle) -> Result<(), String> {
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window(STYLE_GUIDE_LABEL) {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+            return;
+        }
+        let Ok(url) = STYLE_GUIDE.parse() else { return };
+        let built = tauri::WebviewWindowBuilder::new(&handle, STYLE_GUIDE_LABEL, tauri::WebviewUrl::External(url))
+            .title("Style Guide")
+            .inner_size(1280.0, 860.0)
+            .background_color(tauri::window::Color(14, 14, 20, 255))
+            .on_navigation(|url| style_guide_may_load(url))
+            .build();
+        if let Err(error) = built {
+            eprintln!("Style guide window failed to open: {error}");
+        }
+    })
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod style_guide_tests {
+    use super::*;
+
+    #[test]
+    fn style_guide_window_stays_on_local_files() {
+        assert!(style_guide_may_load(&STYLE_GUIDE.parse().unwrap()));
+        assert!(!style_guide_may_load(&"https://example.com".parse().unwrap()));
+        assert!(std::path::Path::new(r"X:\AI-2\visual-style-menu\visual-style-menu.html").exists());
+    }
+}

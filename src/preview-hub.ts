@@ -99,6 +99,12 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   const w = window as any;
   (w.__hubCalls ??= []).push({ command, args });
   if (command.startsWith('hub_tool_') || command === 'hub_open_path') return invokeTools(command, args) as T;
+  if (command === 'hub_skills_list' || command === 'hub_skills_rebuild') return [
+    { kind: 'skill', name: 'agent-firefox', description: 'Browse with the agent Firefox', places: ['Claude Code'], path: 'C:/skills/agent-firefox/SKILL.md', ours: true },
+    { kind: 'agent', name: 'planner', description: 'Plans features', places: ['Claude Code (plugin ecc ON)'], path: 'C:/plugins/planner.md', ours: false },
+    { kind: 'command', name: 'deploy', description: 'Ships a build', places: ['OpenCode'], path: 'C:/oc/deploy.md', ours: false },
+    { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
+  ] as T;
   if (command === 'usage_ledger') {
     const h = Math.floor(Date.now() / 3600_000);
     return { scannedAt: Date.now(), models: [{ provider: 'claude', name: 'Claude Opus 5.5' }, { provider: 'codex', name: 'GPT-6 Luna' }], rows: [[h, 0, 1000, 50000, 200, 300, 0, 0], [h - 24, 1, 400, 0, 0, 100, 0, 0], [h - 48, 0, 2000, 0, 0, 500, 0, 0]] } as T;
@@ -107,6 +113,10 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   if (command === 'hub_voice_start') { if (w.__hubVoice && w.__hubVoice !== args.kind) throw new Error('Another voice is already on. Stop it first.'); w.__hubVoice = args.kind; return { running: args.kind } as T; }
   if (command === 'hub_voice_stop') { w.__hubVoice = null; return { running: null } as T; }
   if (!command.startsWith('hub_')) return invokeChats(command, args) as T;
+  if (command === 'hub_org') return [
+    { pid: 11, sessionId: 's1', title: 'Build the Hub', cwd: 'X:/AI-2', status: 'busy', startedMs: Date.now() - 3600000, lastWords: 'Copying SwarmClaw pages', log: 'X:/log.jsonl',
+      helpers: [{ id: 'a1', description: 'Find skill files', agentType: 'Explore', model: 'haiku', state: 'working', lastWords: 'Found 8', updatedMs: Date.now(), log: 'X:/a1.jsonl' }] },
+  ] as T;
   if (command === 'hub_running_now') {
     const facts: RunningNowFacts = {
       memory: { totalMb: 32604, freeMb: 14210 },

@@ -1014,7 +1014,7 @@ function previewAgentsDock<T>(command: string, args: Record<string, any>): T {
 
 export async function invoke<T>(command: string, args: Record<string, any>): Promise<T> {
   // The Hub window answers every call from its own preview, so its page tests never depend on the main window's sample data.
-  if (command.startsWith('hub_') || location.pathname.endsWith('/hub.html')) return (await import('./preview-hub')).invokeHub<T>(command, args);
+  if (command.startsWith('hub_') || /\/hub(-classic)?\.html$/.test(location.pathname)) return (await import('./preview-hub')).invokeHub<T>(command, args);
   if (/^schedules?_|^scheduler_/.test(command)) return (await import('./preview-schedules')).invokeSchedules<T>(command, args, {
     sessions: () => sessions.map(s => ({ id: s.id, title: s.title, projectId: s.projectId })),
     projects: () => projects,

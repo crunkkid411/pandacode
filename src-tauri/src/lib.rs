@@ -3,6 +3,8 @@ mod account_sign_in;
 mod agent_tools;
 mod agents_dock;
 mod hub;
+mod hub_org;
+mod hub_skills;
 mod hub_tools;
 mod hub_voice;
 mod agent_usage;
@@ -4097,6 +4099,12 @@ pub fn run() {
                     hub_tools::hub_open_path,
                     // Usage panel: PandaCode's ledger of Claude Code and Codex logs.
                     usage_ledger::usage_ledger,
+                    // Org chart panel: live agent sessions and their helpers.
+                    hub_org::hub_org,
+                    hub::hub_open_style_guide,
+                    // Skills panel: Jordan's own skill catalog.
+                    hub_skills::hub_skills_list,
+                    hub_skills::hub_skills_rebuild,
                     // Voice panel: start / stop Jordan's voice agent.
                     hub_voice::hub_voice_status,
                     hub_voice::hub_voice_start,

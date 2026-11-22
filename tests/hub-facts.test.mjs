@@ -133,3 +133,20 @@ test('usage: work per day per agent, cache reads left out, old days dropped', ()
   assert.deepEqual(modelShare({ ...ledger, rows: [] }, 7, now), []);
   assert.equal(short(1234567), '1.2M');
 });
+
+import { filterSkills, switchState } from '../src/hub/skills-facts.ts';
+
+test('skills: every typed word must match, made-for-you first, kind and ours filters', () => {
+  const all = [
+    { kind: 'skill', name: 'zeta', description: 'video editing rules', places: ['X:\AI-2 project'], path: '', ours: true },
+    { kind: 'agent', name: 'alpha', description: 'video planner', places: ['Claude Code (plugin x ON)'], path: '', ours: false },
+    { kind: 'skill', name: 'beta', description: 'music', places: ['Codex'], path: '', ours: false },
+  ];
+  assert.deepEqual(filterSkills(all, 'video', 'all', false).map(s => s.name), ['zeta', 'alpha']);
+  assert.deepEqual(filterSkills(all, 'VIDEO rules', 'all', false).map(s => s.name), ['zeta']);
+  assert.deepEqual(filterSkills(all, '', 'skill', false).map(s => s.name), ['zeta', 'beta']);
+  assert.deepEqual(filterSkills(all, '', 'all', true).map(s => s.name), ['zeta']);
+  assert.deepEqual(filterSkills(all, 'codex', 'all', false).map(s => s.name), ['beta']);
+  assert.equal(switchState(all[1]), 'on');
+  assert.equal(switchState(all[2]), null);
+});
