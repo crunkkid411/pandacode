@@ -44,6 +44,8 @@ export interface RouteResult { pick: RoutedModel | null; difficulty: number; cat
 // ponytail: Antigravity is a sign-in agent too, but its ACP server lacks the HTTP MCP support
 // PandaCode chats need ("does not advertise HTTP MCP support", seen 2026-11-22); add it back once it has it.
 export const SIGN_IN_AGENTS = ['claude', 'codex'];
+/** Sign-in agents whose PandaCode chats fail on this PC (see above). */
+export const CHATS_FAIL = ['antigravity'];
 /** A model that costs nothing whichever agent runs it. */
 export const freeModel = (id: string) => /:free$/.test(id) || id.startsWith('freellmapi/');
 
@@ -55,4 +57,12 @@ export function routePool(lists: { provider: string; models: ProviderModel[] }[]
     .filter(m => m.id && m.id !== 'default' && (SIGN_IN_AGENTS.includes(provider) || freeModel(m.id)))
     .slice(0, perAgent)
     .map(m => ({ provider, model: m.id, name: m.name || m.id })));
+}
+
+/** What the Ask box may use from one agent: all of it (sign-in), only its free models, or nothing. */
+export function askUse(provider: string, models: ProviderModel[]): { kind: 'sign-in' | 'free' | 'skipped' | 'fails'; free: number } {
+  if (SIGN_IN_AGENTS.includes(provider)) return { kind: 'sign-in', free: 0 };
+  if (CHATS_FAIL.includes(provider)) return { kind: 'fails', free: 0 };
+  const free = models.filter(m => freeModel(m.id)).length;
+  return free > 0 ? { kind: 'free', free } : { kind: 'skipped', free: 0 };
 }

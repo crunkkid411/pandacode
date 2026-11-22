@@ -40,9 +40,11 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
   const w = window as any;
   switch (command) {
     case 'list_sessions': return chats.map(c => ({ ...c }));
-    case 'list_providers': return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }];
+    case 'list_providers': if (w.__hubSlowProviders && !w.__hubSlowDone) { w.__hubSlowDone = true; return new Promise(r => setTimeout(() => r(invokeHub('list_providers', args)), 800)); }
+      return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }, ...((window as any).__hubBroken ? [{ id: 'cursor-broken', name: 'Broken Agent', installed: true }] : [])];
     case 'get_messages': return { messages: (messages[args.sessionId] ?? []).map(m => ({ ...m })), hasOlder: false };
-    case 'list_provider_models': return args.provider === 'claude' ? [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] : [{ id: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }];
+    case 'list_provider_models': if (args.provider === 'cursor-broken') throw new Error('Cursor exited before returning models' + String.fromCharCode(10) + 'Details: more');
+      return args.provider === 'claude' ? [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] : [{ id: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }];
     case 'model_routing_route': return w.__hubNoRoute ? { pick: null, difficulty: 3, category: 'implementation', profiler: 'onnx' } : { pick: { provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5', pSuccess: 0.8 }, difficulty: 5, category: 'implementation', profiler: 'onnx' };
     case 'chat_create': {
       const c: Chat = { id: `c${nextId++}`, title: 'New chat', provider: args.provider, model: args.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null };
@@ -97,6 +99,10 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   const w = window as any;
   (w.__hubCalls ??= []).push({ command, args });
   if (command.startsWith('hub_tool_') || command === 'hub_open_path') return invokeTools(command, args) as T;
+  if (command === 'usage_ledger') {
+    const h = Math.floor(Date.now() / 3600_000);
+    return { scannedAt: Date.now(), models: [{ provider: 'claude', name: 'Claude Opus 5.5' }, { provider: 'codex', name: 'GPT-6 Luna' }], rows: [[h, 0, 1000, 50000, 200, 300, 0, 0], [h - 24, 1, 400, 0, 0, 100, 0, 0], [h - 48, 0, 2000, 0, 0, 500, 0, 0]] } as T;
+  }
   if (command === 'hub_voice_status') return { running: w.__hubVoice ?? null } as T;
   if (command === 'hub_voice_start') { if (w.__hubVoice && w.__hubVoice !== args.kind) throw new Error('Another voice is already on. Stop it first.'); w.__hubVoice = args.kind; return { running: args.kind } as T; }
   if (command === 'hub_voice_stop') { w.__hubVoice = null; return { running: null } as T; }

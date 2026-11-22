@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows five panels, Running now first, and only panels that are built', async ({ page }) => {
+test('the Hub shows seven panels, Running now first, and only panels that are built', async ({ page }) => {
   await page.goto('/hub.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(5);
+  await expect(nav.getByRole('button')).toHaveCount(7);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -246,4 +246,39 @@ test('voice: Start turns one voice on, the other waits, Stop turns it off', asyn
   await expect(page.getByRole('button', { name: 'Start Talk with Groq' })).toBeEnabled();
   expect((await calls(page, 'hub_voice_start')).map(c => c.args)).toEqual([{ kind: 'gemini' }]);
   expect(await calls(page, 'hub_voice_stop')).toHaveLength(1);
+});
+
+test('providers: each agent shows if it works, why not, and what Ask may use', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubBroken = true; });
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Providers' }).click();
+  const list = page.getByRole('list', { name: 'Installed agents' });
+  await expect(list.getByRole('listitem', { name: 'Claude Code' }).getByRole('img', { name: 'Works' })).toBeVisible();
+  await expect(list.getByRole('listitem', { name: 'Claude Code' })).toContainText('Ask uses it (your sign-in)');
+  await expect(list.getByRole('listitem', { name: 'OpenCode' })).toContainText('Ask uses its 1 free models');
+  await expect(list.getByRole('listitem', { name: 'Broken Agent' }).getByRole('img', { name: 'Not working' })).toBeVisible();
+  await expect(list.getByRole('listitem', { name: 'Broken Agent' })).toContainText('Cursor exited before returning models');
+  await expect(page.getByRole('region', { name: 'Not installed' })).toContainText('Cursor');
+  await list.getByRole('button', { name: 'Check Claude Code again' }).click();
+  await expect.poll(async () => (await calls(page, 'list_provider_models')).some(c => c.args.provider === 'claude' && c.args.force === true)).toBe(true);
+});
+
+test('usage: a bar per day for two weeks, and which models did the work', async ({ page }) => {
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Usage' }).click();
+  await expect(page.getByRole('region', { name: 'Work per day' }).getByRole('listitem')).toHaveCount(14);
+  const models = page.getByRole('region', { name: 'Models this week' });
+  await expect(models.getByRole('listitem').first()).toContainText('Claude Opus 5.5');
+  await expect(models.getByRole('listitem')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Read again' }).click();
+  await expect.poll(async () => (await calls(page, 'usage_ledger')).map(c => c.args.refresh)).toEqual([false, true]);
+});
+
+test('providers: says it is looking while the agent scan runs', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubSlowProviders = true; });
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Providers' }).click();
+  await expect(page.getByRole('status')).toContainText('Looking for your agents');
+  await expect(page.getByRole('list', { name: 'Installed agents' }).getByRole('listitem').first()).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(0);
 });

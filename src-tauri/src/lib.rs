@@ -4095,6 +4095,8 @@ pub fn run() {
                     hub_tools::hub_tool_jobs,
                     hub_tools::hub_tool_stop,
                     hub_tools::hub_open_path,
+                    // Usage panel: PandaCode's ledger of Claude Code and Codex logs.
+                    usage_ledger::usage_ledger,
                     // Voice panel: start / stop Jordan's voice agent.
                     hub_voice::hub_voice_status,
                     hub_voice::hub_voice_start,

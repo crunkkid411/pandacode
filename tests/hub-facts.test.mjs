@@ -103,3 +103,33 @@ test('the router never gets a paid model: only sign-in agents or free models', (
   ]);
   assert.deepEqual(pool.map(p => p.model), ['openrouter:dots/x:free', 'gpt-6-luna']);
 });
+
+import { askUse } from '../src/hub/chats-facts.ts';
+
+test('the Providers page says what Ask may use from each agent', () => {
+  assert.deepEqual(askUse('claude', []), { kind: 'sign-in', free: 0 });
+  assert.deepEqual(askUse('hermes', [{ id: 'openrouter:x:free', name: 'x' }, { id: 'openrouter:paid', name: 'p' }]), { kind: 'free', free: 1 });
+  assert.deepEqual(askUse('kilo', [{ id: 'openrouter/paid', name: 'p' }]), { kind: 'skipped', free: 0 });
+  assert.deepEqual(askUse('antigravity', [{ id: 'gemini', name: 'g' }]), { kind: 'fails', free: 0 });
+});
+
+import { dailyWork, modelShare, short } from '../src/hub/usage-facts.ts';
+
+test('usage: work per day per agent, cache reads left out, old days dropped', () => {
+  const now = new Date(2026, 10, 22, 15).getTime();
+  const hour = (d, h) => new Date(2026, 10, d, h).getTime() / 3600_000;
+  const ledger = { scannedAt: now, models: [{ provider: 'claude', name: 'Opus' }, { provider: 'codex', name: 'GPT' }], rows: [
+    [hour(22, 9), 0, 100, 999999, 10, 5, 0, 0],
+    [hour(22, 10), 1, 50, 0, 0, 50, 0, 0],
+    [hour(21, 23), 0, 7, 0, 0, 0, 0, 0],
+    [hour(1, 9), 0, 1000, 0, 0, 0, 0, 0],
+  ] };
+  const days = dailyWork(ledger, 3, now);
+  assert.equal(days.length, 3);
+  assert.deepEqual(days.map(d => [d.claude, d.codex]), [[0, 0], [7, 0], [115, 100]]);
+  const share = modelShare(ledger, 7, now);
+  assert.equal(share[0].name, 'Opus');
+  assert.ok(Math.abs(share[0].share - 122 / 222) < 1e-9);
+  assert.deepEqual(modelShare({ ...ledger, rows: [] }, 7, now), []);
+  assert.equal(short(1234567), '1.2M');
+});

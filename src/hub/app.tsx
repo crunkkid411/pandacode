@@ -1,9 +1,11 @@
-import { Activity, Bot, MessagesSquare, Mic, Wrench } from 'lucide-react';
+import { Activity, BarChart3, Bot, MessagesSquare, Mic, Plug, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Agents } from './agents';
 import { Chats } from './chats';
 import { RunningNow } from './running-now';
+import { Providers } from './providers';
 import { Tools } from './tools';
+import { Usage } from './usage';
 import { Voice } from './voice';
 
 // One entry per panel that is really built. A panel with no backend is not drawn (JOBS.md J10).
@@ -11,6 +13,8 @@ const PANELS = [
   { id: 'running-now', label: 'Running now', icon: Activity, view: RunningNow },
   { id: 'chats', label: 'Chats', icon: MessagesSquare, view: Chats },
   { id: 'agents', label: 'Agents', icon: Bot, view: Agents },
+  { id: 'providers', label: 'Providers', icon: Plug, view: Providers },
+  { id: 'usage', label: 'Usage', icon: BarChart3, view: Usage },
   { id: 'tools', label: 'Tools', icon: Wrench, view: Tools },
   { id: 'voice', label: 'Voice', icon: Mic, view: Voice },
 ] as const;
