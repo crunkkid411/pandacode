@@ -2,6 +2,7 @@ mod account_pool;
 mod account_sign_in;
 mod agent_tools;
 mod agents_dock;
+mod hub;
 mod agent_usage;
 mod agent_updates;
 mod agent_usage_providers;
@@ -3990,8 +3991,16 @@ pub fn run() {
     }
     let app = tauri::Builder::default()
         // First, as its docs require: a second launch focuses this window instead of opening another.
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            tray::show(app)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            // A second `pandacode.exe --hub` (the desktop shortcut) opens the Hub in the
+            // running copy instead of a second app.
+            if hub::wants_hub(&args) {
+                if let Err(error) = hub::open(app) {
+                    eprintln!("Hub window failed to open: {error}");
+                }
+            } else {
+                tray::show(app)
+            }
         }))
         .plugin(tauri_plugin_dialog::init())
         // Updates come only from GitHub Releases, verified against the public key in tauri.conf.json.
@@ -4010,6 +4019,15 @@ pub fn run() {
             vm::watch_idle(app.handle().clone());
             if let Err(error) = tray::setup(app.handle()) {
                 eprintln!("Menu bar item is unavailable: {error}");
+            }
+            if hub::wants_hub(std::env::args()) {
+                if let Err(error) = hub::open(app.handle()) {
+                    eprintln!("Hub window failed to open: {error}");
+                }
+                // Opened for the Hub only: keep the main window out of the way.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
             }
             if let Some(window) = app.get_webview_window("main") {
                 if let Err(error) = appearance::setup(&window) {
@@ -4049,6 +4067,14 @@ pub fn run() {
                 ];
                 return handler(invoke);
             }
+            if invoke.message.webview_ref().label() == hub::LABEL {
+                let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                    hub::hub_running_now,
+                    hub::hub_task_run_now,
+                    hub::hub_task_set_enabled,
+                ];
+                return handler(invoke);
+            }
             if invoke.message.webview_ref().label() == "agents-dock" {
                 let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
                     agents_dock::agents_dock_snapshot,
@@ -4069,6 +4095,7 @@ pub fn run() {
                 agents_dock::agents_dock_preferences,
                 agents_dock::agents_dock_save_preferences,
                 agents_dock::agents_dock_pin,
+                hub::open_hub,
                 support::open_support,
                 support::support_details,
                 model_routing::model_routing_status,

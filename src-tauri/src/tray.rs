@@ -39,6 +39,7 @@ pub(crate) fn setup(app: &AppHandle) -> tauri::Result<()> {
         app,
         &[
             &MenuItem::with_id(app, "show", "Open PandaCode", true, None::<&str>)?,
+            &MenuItem::with_id(app, "hub", "Open Hub", true, None::<&str>)?,
             &MenuItem::with_id(app, "quit", "Quit PandaCode", true, None::<&str>)?,
         ],
     )?;
@@ -96,6 +97,11 @@ fn rebuild(app: &AppHandle) {
 fn on_menu(app: &AppHandle, event: MenuEvent) {
     match event.id.as_ref() {
         "show" => show(app),
+        "hub" => {
+            if let Err(error) = crate::hub::open(app) {
+                eprintln!("Hub window failed to open: {error}");
+            }
+        }
         "quit" => app.exit(0),
         _ => {}
     }

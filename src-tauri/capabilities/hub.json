@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "hub-capability",
+  "description": "Hub window: facts and actions only through the hub_* commands in src/hub.rs.",
+  "webviews": ["hub"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

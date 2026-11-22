@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* SwarmClaw's "Midnight Glass" palette, copied from X:\AI-2\swarmclaw\src\app\globals.css (MIT).
+   Each colour has ONE meaning in Hub (LESSONS.md section 4):
+   success = healthy / on / last run worked, danger = failed / too hot / could not read,
+   warn = filling up / warm / running right now, accent = selected, text-3 = switched off. */
+@theme {
+  --color-bg: color-mix(in srgb, #1e1e30 40%, #000);
+  --color-raised: color-mix(in srgb, #1e1e30 50%, #000);
+  --color-surface: color-mix(in srgb, #1e1e30 65%, #000);
+  --color-surface-2: #1e1e30;
+  --color-surface-3: color-mix(in srgb, #1e1e30 80%, #333);
+  --color-border-hi: rgba(255, 255, 255, 0.07);
+  --color-text: #e2e2ec;
+  --color-text-2: #a0a0ba;
+  --color-text-3: #8282a0;
+  --color-accent: #6366f1;
+  --color-accent-soft: rgba(99, 102, 241, 0.12);
+  --color-accent-bright: #818cf8;
+  --color-success: #34d399;
+  --color-success-soft: rgba(52, 211, 153, 0.1);
+  --color-danger: #f43f5e;
+  --color-danger-soft: rgba(244, 63, 94, 0.1);
+  --color-warn: #f59e0b;
+  --color-warn-soft: rgba(245, 158, 11, 0.12);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html, body, #hub-root { height: 100%; margin: 0; }
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* SwarmClaw's sidebar rail button, same sizes and states. */
+.rail-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.rail-btn:hover { background: rgba(255, 255, 255, 0.04); color: var(--color-text-2); }
+.rail-btn.active { background: var(--color-accent-soft); color: var(--color-accent-bright); }
+
+:focus-visible { outline: 2px solid var(--color-accent-bright); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

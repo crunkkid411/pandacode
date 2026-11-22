@@ -28,6 +28,8 @@ uuid = { version = "1", features = ["v4", "v7"] }
 portable-pty = "0.9"
 ignore = "0.4.33"
 regex = "1"
+# Hub window: memory + process facts in-process (no child program per poll).
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
 flate2 = "=1.1.10"
 libc = "0.2"
 base64 = "0.22"
