@@ -57,3 +57,26 @@ test('chats: newest activity first, no drafts or archived', () => {
   assert.equal(speaker('assistant'), 'agent');
   assert.equal(speaker('changes'), 'note');
 });
+
+import { scheduleWhen, untilText } from '../src/hub/agents-facts.ts';
+
+const sched = over => ({ id: 's', title: 'T', sessionTitle: 'C', projectName: 'P', prompt: '', kind: 'interval', intervalMinutes: 30, timeOfDay: null, days: [], watchSessionTitle: null, nextRunAt: null, lastRunAt: null, enabled: true, runCount: 0, ...over });
+
+test('scheduled chats say how often they run, in plain words', () => {
+  assert.equal(scheduleWhen(sched({})), 'Every 30 min');
+  assert.equal(scheduleWhen(sched({ intervalMinutes: 120 })), 'Every 2 h');
+  assert.equal(scheduleWhen(sched({ kind: 'daily', timeOfDay: '07:30' })), 'Every day at 07:30');
+  assert.equal(scheduleWhen(sched({ kind: 'weekdays', timeOfDay: '09:00' })), 'Weekdays at 09:00');
+  assert.equal(scheduleWhen(sched({ kind: 'weekly', days: [1, 3], timeOfDay: '18:00' })), 'Mon, Wed at 18:00');
+  assert.equal(scheduleWhen(sched({ kind: 'after', watchSessionTitle: 'Build' })), 'After "Build"');
+  assert.equal(scheduleWhen(sched({ kind: 'once' })), 'Once');
+});
+
+test('next run reads as a short countdown', () => {
+  const now = 1_000_000_000_000;
+  assert.equal(untilText(null, now), '');
+  assert.equal(untilText(now - 5, now), 'now');
+  assert.equal(untilText(now + 5 * 60_000, now), 'in 5 min');
+  assert.equal(untilText(now + 3 * 3_600_000, now), 'in 3 h');
+  assert.equal(untilText(now + 3 * 86_400_000, now), 'in 3 d');
+});

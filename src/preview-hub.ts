@@ -3,6 +3,7 @@
 // graphics card "not answer", like a crashed driver.
 import type { RunningNowFacts, Task } from './hub/facts';
 import type { Chat, ChatMessage } from './hub/chats-facts';
+import type { HubBot, HubSchedule } from './hub/agents-facts';
 
 const tasks: Task[] = [
   { path: '\\Becky Playlist Scout (idle)', name: 'Becky Playlist Scout (idle)', enabled: true, state: 'Ready', lastRun: '11/22/2026 3:10:00 AM', lastResult: 0, nextRun: '11/22/2026 7:10:00 AM', action: 'wscript run-hidden.vbs', mine: true },
@@ -25,6 +26,16 @@ const messages: Record<string, ChatMessage[]> = {
 };
 let nextId = 100;
 
+// Agents: PandaCode's bots and scheduled chats.
+const bots: HubBot[] = [
+  { id: 'b1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null },
+  { id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null },
+];
+const schedules: HubSchedule[] = [
+  { id: 's1', title: 'Morning news digest', sessionTitle: 'News', projectName: 'AI-2', prompt: 'Summarise AI news', kind: 'daily', intervalMinutes: null, timeOfDay: '07:30', days: [], watchSessionTitle: null, nextRunAt: now + 3 * 3_600_000, lastRunAt: now - 20 * 3_600_000, enabled: true, runCount: 12 },
+  { id: 's2', title: 'Check the build', sessionTitle: 'Build', projectName: 'pandacode', prompt: 'Run the tests', kind: 'interval', intervalMinutes: 30, timeOfDay: null, days: [], watchSessionTitle: null, nextRunAt: now + 10 * 60_000, lastRunAt: now - 20 * 60_000, enabled: false, runCount: 3 },
+];
+
 function invokeChats(command: string, args: Record<string, any>): unknown {
   const w = window as any;
   switch (command) {
@@ -46,6 +57,11 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       if (!w.__hubHoldRunning) setTimeout(() => { messages[c.id].push({ id: nextId++, role: 'assistant', content: `Done: ${args.text}`, createdAt: Date.now() }); c.status = 'idle'; c.lastResponseAt = Date.now(); }, 300);
       return undefined;
     }
+    case 'bots_list': return bots.map(b => ({ ...b }));
+    case 'bot_set_paused': { const b = bots.find(x => x.id === args.botId); if (!b) throw new Error('No bot'); b.paused = Boolean(args.paused); return { ...b }; }
+    case 'schedules_list': return schedules.map(x => ({ ...x }));
+    case 'schedule_set_enabled': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.enabled = Boolean(args.enabled); return { ...x }; }
+    case 'schedule_run_now': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.runCount++; x.lastRunAt = Date.now(); return { scheduleId: x.id }; }
     case 'stop_session': {
       const c = chats.find(x => x.id === args.sessionId);
       if (c) c.status = 'interrupted';

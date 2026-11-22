@@ -1,5 +1,6 @@
-import { Activity, MessagesSquare } from 'lucide-react';
+import { Activity, Bot, MessagesSquare } from 'lucide-react';
 import { useState } from 'react';
+import { Agents } from './agents';
 import { Chats } from './chats';
 import { RunningNow } from './running-now';
 
@@ -7,6 +8,7 @@ import { RunningNow } from './running-now';
 const PANELS = [
   { id: 'running-now', label: 'Running now', icon: Activity, view: RunningNow },
   { id: 'chats', label: 'Chats', icon: MessagesSquare, view: Chats },
+  { id: 'agents', label: 'Agents', icon: Bot, view: Agents },
 ] as const;
 
 export function App() {

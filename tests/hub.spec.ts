@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows two panels, Running now first, and only panels that are built', async ({ page }) => {
+test('the Hub shows three panels, Running now first, and only panels that are built', async ({ page }) => {
   await page.goto('/hub.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(2);
+  await expect(nav.getByRole('button')).toHaveCount(3);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -125,4 +125,47 @@ test('chats: ctrl and shift select several; Stop all stops only the working ones
   await chatRow(page, 'Fix the playlist scout').click({ modifiers: ['Control'] });
   await page.getByRole('button', { name: 'Stop all' }).click();
   await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args)).toEqual([{ sessionId: 'c2' }]);
+});
+
+const openAgents = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agents' }).click(); };
+
+test('agents: bots and scheduled chats show with their timing', async ({ page }) => {
+  await openAgents(page);
+  await expect(page.getByRole('list', { name: 'Bots list' }).getByRole('listitem')).toHaveText([/Chief of Staff/, /Inbox Sorter.*Paused/]);
+  await expect(page.getByRole('list', { name: 'Scheduled chats list' }).getByRole('listitem')).toHaveText([/Morning news digest.*Every day at 07:30/, /Check the build.*Every 30 min/]);
+});
+
+test('agents: the switch pauses that bot and turns that scheduled chat on', async ({ page }) => {
+  await openAgents(page);
+  await page.getByRole('switch', { name: 'Chief of Staff working or paused' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_set_paused')).map(c => c.args)).toEqual([{ botId: 'b1', paused: true }]);
+  await expect(page.getByRole('switch', { name: 'Chief of Staff working or paused' })).toHaveAttribute('aria-checked', 'false');
+  await page.getByRole('switch', { name: 'Check the build on or off' }).click();
+  await expect.poll(async () => (await calls(page, 'schedule_set_enabled')).map(c => c.args)).toEqual([{ scheduleId: 's2', enabled: true }]);
+  await expect(page.getByRole('switch', { name: 'Check the build on or off' })).toHaveAttribute('aria-checked', 'true');
+});
+
+test('agents: run now runs exactly that scheduled chat', async ({ page }) => {
+  await openAgents(page);
+  await page.getByRole('button', { name: 'Run Morning news digest now' }).click();
+  await expect.poll(async () => (await calls(page, 'schedule_run_now')).map(c => c.args)).toEqual([{ scheduleId: 's1' }]);
+});
+
+test('agents: shift selects both bots, Resume all resumes each one', async ({ page }) => {
+  await openAgents(page);
+  const rows = page.getByRole('list', { name: 'Bots list' }).getByRole('listitem');
+  await rows.filter({ hasText: 'Chief of Staff' }).click();
+  await rows.filter({ hasText: 'Inbox Sorter' }).click({ modifiers: ['Shift'] });
+  await expect(page.getByRole('toolbar', { name: 'Selected bots' })).toContainText('2');
+  await page.getByRole('button', { name: 'Resume all' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_set_paused')).map(c => c.args)).toEqual([{ botId: 'b1', paused: false }, { botId: 'b2', paused: false }]);
+});
+
+test('agents: ctrl selects two scheduled chats; Switch off turns off each', async ({ page }) => {
+  await openAgents(page);
+  const rows = page.getByRole('list', { name: 'Scheduled chats list' }).getByRole('listitem');
+  await rows.filter({ hasText: 'Morning news digest' }).click();
+  await rows.filter({ hasText: 'Check the build' }).click({ modifiers: ['Control'] });
+  await page.getByRole('button', { name: 'Switch off' }).click();
+  await expect.poll(async () => (await calls(page, 'schedule_set_enabled')).map(c => c.args)).toEqual([{ scheduleId: 's1', enabled: false }, { scheduleId: 's2', enabled: false }]);
 });

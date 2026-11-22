@@ -814,7 +814,8 @@ pub struct BotDetail {
 }
 
 fn guard_main(window: &tauri::WebviewWindow) -> Result<()> {
-    if window.label() != "main" {
+    // The Hub window may pause and resume bots too (its Agents panel).
+    if window.label() != "main" && window.label() != crate::hub::LABEL {
         return Err("Bots are managed from the main window.".into());
     }
     Ok(())

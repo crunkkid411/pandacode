@@ -93,7 +93,7 @@ const STATE_LOOK: Record<TaskState, { icon: ReactNode; tone: Tone; word: string 
   off: { icon: null, tone: 'off', word: 'Switched off' },
 };
 
-function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+export function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} title={on ? 'On - click to switch off' : 'Off - click to switch on'}
       onClick={e => { e.stopPropagation(); onToggle(); }}

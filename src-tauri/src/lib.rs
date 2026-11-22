@@ -4079,6 +4079,12 @@ pub fn run() {
                     send_message,
                     stop_session,
                     chats::chat_create,
+                    // Agents panel: PandaCode's bots and scheduled chats.
+                    bots::bots_list,
+                    bots::bot_set_paused,
+                    schedules::schedules_list,
+                    schedules::schedule_set_enabled,
+                    schedules::schedule_run_now,
                 ];
                 return handler(invoke);
             }
