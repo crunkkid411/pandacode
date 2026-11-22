@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows four panels, Running now first, and only panels that are built', async ({ page }) => {
+test('the Hub shows five panels, Running now first, and only panels that are built', async ({ page }) => {
   await page.goto('/hub.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(4);
+  await expect(nav.getByRole('button')).toHaveCount(5);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -234,4 +234,16 @@ test('chats: an agent error shows in red with its real words; empty system lines
   await page.getByRole('button', { name: 'Ask' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'This harness cannot run here.' })).toBeVisible();
   await expect(page.getByText('changes', { exact: true })).toHaveCount(0);
+});
+
+test('voice: Start turns one voice on, the other waits, Stop turns it off', async ({ page }) => {
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Voice' }).click();
+  await page.getByRole('button', { name: 'Start Talk with Gemini' }).click();
+  await expect(page.getByText('On now. Talk in its window.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start Talk with Groq' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Stop Talk with Gemini' }).click();
+  await expect(page.getByRole('button', { name: 'Start Talk with Groq' })).toBeEnabled();
+  expect((await calls(page, 'hub_voice_start')).map(c => c.args)).toEqual([{ kind: 'gemini' }]);
+  expect(await calls(page, 'hub_voice_stop')).toHaveLength(1);
 });

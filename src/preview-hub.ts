@@ -97,6 +97,9 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   const w = window as any;
   (w.__hubCalls ??= []).push({ command, args });
   if (command.startsWith('hub_tool_') || command === 'hub_open_path') return invokeTools(command, args) as T;
+  if (command === 'hub_voice_status') return { running: w.__hubVoice ?? null } as T;
+  if (command === 'hub_voice_start') { if (w.__hubVoice && w.__hubVoice !== args.kind) throw new Error('Another voice is already on. Stop it first.'); w.__hubVoice = args.kind; return { running: args.kind } as T; }
+  if (command === 'hub_voice_stop') { w.__hubVoice = null; return { running: null } as T; }
   if (!command.startsWith('hub_')) return invokeChats(command, args) as T;
   if (command === 'hub_running_now') {
     const facts: RunningNowFacts = {

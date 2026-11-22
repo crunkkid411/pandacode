@@ -4,6 +4,7 @@ mod agent_tools;
 mod agents_dock;
 mod hub;
 mod hub_tools;
+mod hub_voice;
 mod agent_usage;
 mod agent_updates;
 mod agent_usage_providers;
@@ -4094,6 +4095,10 @@ pub fn run() {
                     hub_tools::hub_tool_jobs,
                     hub_tools::hub_tool_stop,
                     hub_tools::hub_open_path,
+                    // Voice panel: start / stop Jordan's voice agent.
+                    hub_voice::hub_voice_status,
+                    hub_voice::hub_voice_start,
+                    hub_voice::hub_voice_stop,
                 ];
                 return handler(invoke);
             }
