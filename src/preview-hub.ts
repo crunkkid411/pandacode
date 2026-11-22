@@ -71,9 +71,29 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
   throw new Error(`Unknown Hub command ${command}`);
 }
 
+// Tools: one job at a time, like hub_tools.rs. A job finishes after 400 ms unless a test holds it.
+const jobs: any[] = [];
+function invokeTools(command: string, args: Record<string, any>): unknown {
+  const w = window as any;
+  if (command === 'hub_tool_jobs') return [...jobs].reverse().map(j => ({ ...j }));
+  if (command === 'hub_tool_run') {
+    const running = jobs.some(j => j.state === 'running');
+    const job = { id: jobs.length + 1, tool: args.tool, file: args.file, state: running ? 'waiting' : 'running', note: running ? 'In line' : 'Listening', output: args.file.replace(/\.[^.\\]+$/, '.transcript.srt'), queuedMs: Date.now(), finishedMs: null };
+    jobs.push(job);
+    const finish = () => { if (job.state !== 'running') return; job.state = 'done'; job.note = 'Finished'; const next = jobs.find(j => j.state === 'waiting'); if (next) { next.state = 'running'; setTimeout(() => finishNext(next), 400); } };
+    const finishNext = (j: any) => { if (j.state !== 'running') return; j.state = 'done'; j.note = 'Finished'; };
+    if (!running && !w.__hubHoldJobs) setTimeout(finish, 400);
+    return { ...job };
+  }
+  if (command === 'hub_tool_stop') { const j = jobs.find(x => x.id === args.id); if (j && (j.state === 'running' || j.state === 'waiting')) { j.state = 'stopped'; j.note = 'Stopped'; } return undefined; }
+  if (command === 'hub_open_path') return undefined;
+  throw new Error(`Unknown Hub command ${command}`);
+}
+
 export function invokeHub<T>(command: string, args: Record<string, any>): T {
   const w = window as any;
   (w.__hubCalls ??= []).push({ command, args });
+  if (command.startsWith('hub_tool_') || command === 'hub_open_path') return invokeTools(command, args) as T;
   if (!command.startsWith('hub_')) return invokeChats(command, args) as T;
   if (command === 'hub_running_now') {
     const facts: RunningNowFacts = {

@@ -6,10 +6,10 @@ const calls = (page: Page, name: string): Promise<any[]> =>
   page.evaluate(n => ((window as any).__hubCalls ?? []).filter((c: any) => c.command === n), name);
 const row = (page: Page, name: string) => page.getByRole('list', { name: 'Scheduled tasks' }).getByRole('listitem').filter({ hasText: name });
 
-test('the Hub shows three panels, Running now first, and only panels that are built', async ({ page }) => {
+test('the Hub shows four panels, Running now first, and only panels that are built', async ({ page }) => {
   await page.goto('/hub.html');
   const nav = page.getByRole('navigation', { name: 'Panels' });
-  await expect(nav.getByRole('button')).toHaveCount(3);
+  await expect(nav.getByRole('button')).toHaveCount(4);
   await expect(nav.getByRole('button', { name: 'Running now' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Memory', exact: true })).toContainText('14GB free');
@@ -168,4 +168,37 @@ test('agents: ctrl selects two scheduled chats; Switch off turns off each', asyn
   await rows.filter({ hasText: 'Check the build' }).click({ modifiers: ['Control'] });
   await page.getByRole('button', { name: 'Switch off' }).click();
   await expect.poll(async () => (await calls(page, 'schedule_set_enabled')).map(c => c.args)).toEqual([{ scheduleId: 's1', enabled: false }, { scheduleId: 's2', enabled: false }]);
+});
+
+const openTools = async (page: Page) => { await page.goto('/hub.html'); await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Tools' }).click(); };
+
+test('tools: Transcribe sends each picked file as its own job, one at a time', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubPick = ['C:/Videos/a.mp4', 'C:/Videos/b.mp4']; (window as any).__hubHoldJobs = true; });
+  await openTools(page);
+  await page.getByRole('button', { name: 'Transcribe' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_tool_run')).map(c => c.args)).toEqual([{ tool: 'transcribe', file: 'C:/Videos/a.mp4' }, { tool: 'transcribe', file: 'C:/Videos/b.mp4' }]);
+  const rows = page.getByRole('list', { name: 'Jobs list' }).getByRole('listitem');
+  await expect(rows.filter({ hasText: 'a.mp4' }).getByRole('img', { name: 'Working' })).toBeVisible();
+  await expect(rows.filter({ hasText: 'b.mp4' }).getByRole('img', { name: 'Waiting its turn' })).toBeVisible();
+});
+
+test('tools: a finished job opens its result; Stop stops exactly that job', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubPick = ['C:/Videos/a.mp4']; });
+  await openTools(page);
+  await page.getByRole('button', { name: 'Transcribe' }).click();
+  await page.getByRole('button', { name: 'Open a.transcript.srt' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_open_path')).map(c => c.args)).toEqual([{ path: 'C:/Videos/a.transcript.srt', folder: false }]);
+  await page.evaluate(() => { (window as any).__hubHoldJobs = true; (window as any).__hubPick = ['C:/Videos/c.mp4']; });
+  await page.getByRole('button', { name: 'Transcribe' }).click();
+  await page.getByRole('button', { name: 'Stop c.mp4' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_tool_stop')).map(c => c.args)).toEqual([{ id: 2 }]);
+  await expect(page.getByRole('list', { name: 'Jobs list' }).getByRole('listitem').filter({ hasText: 'c.mp4' }).getByRole('img', { name: 'Stopped' })).toBeVisible();
+});
+
+test('tools: picking nothing starts nothing', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubPick = []; });
+  await openTools(page);
+  await page.getByRole('button', { name: 'Transcribe' }).click();
+  await expect(page.getByText('Nothing yet. Click a tool above and pick a file.')).toBeVisible();
+  expect(await calls(page, 'hub_tool_run')).toEqual([]);
 });

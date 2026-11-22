@@ -52,6 +52,15 @@ export async function chooseAttachments(): Promise<string[]> {
   ] });
   return Array.isArray(result) ? result : typeof result === 'string' ? [result] : [];
 }
+/** Videos or recordings for a Hub tool. The preview returns `window.__hubPick` or one sample. */
+export async function chooseMedia(title: string): Promise<string[]> {
+  if (preview) return (window as any).__hubPick ?? ['C:\\Videos\\clip.mp4'];
+  const result = await (await import('@tauri-apps/plugin-dialog')).open({ multiple: true, title, filters: [
+    { name: 'Video and audio', extensions: ['mp4', 'mkv', 'mov', 'avi', 'webm', 'm4v', 'mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac', 'opus'] },
+    { name: 'All files', extensions: ['*'] },
+  ] });
+  return Array.isArray(result) ? result : typeof result === 'string' ? [result] : [];
+}
 /** A VS Code extension package holding color themes. */
 export async function chooseVsix(): Promise<string | null> {
   if (preview) return '/Users/you/Downloads/tokyo-night.vsix';

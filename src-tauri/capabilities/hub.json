@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "hub-capability",
-  "description": "Hub window: facts and actions only through the hub_* commands in src/hub.rs.",
+  "description": "Hub window: facts and actions only through the hub_* commands in src/hub.rs; the open-file box for the Tools panel.",
   "webviews": ["hub"],
   "permissions": [
     "core:event:allow-listen",
-    "core:event:allow-unlisten"
+    "core:event:allow-unlisten",
+    "dialog:allow-open"
   ]
 }

@@ -3,6 +3,7 @@ mod account_sign_in;
 mod agent_tools;
 mod agents_dock;
 mod hub;
+mod hub_tools;
 mod agent_usage;
 mod agent_updates;
 mod agent_usage_providers;
@@ -4085,6 +4086,11 @@ pub fn run() {
                     schedules::schedules_list,
                     schedules::schedule_set_enabled,
                     schedules::schedule_run_now,
+                    // Tools panel: becky tools as one-click jobs.
+                    hub_tools::hub_tool_run,
+                    hub_tools::hub_tool_jobs,
+                    hub_tools::hub_tool_stop,
+                    hub_tools::hub_open_path,
                 ];
                 return handler(invoke);
             }

@@ -91,7 +91,7 @@ fn now_ms() -> u64 {
 }
 
 /// A console program started with no visible window (LESSONS.md section 2: no flashing boxes).
-fn quiet(program: &str) -> Command {
+pub(crate) fn quiet(program: &str) -> Command {
     #[allow(unused_mut)]
     let mut command = Command::new(program);
     #[cfg(windows)]
@@ -160,7 +160,7 @@ fn parse_nvidia_line(line: &str) -> Option<Gpu> {
     })
 }
 
-fn gpu_facts_from(program: &str) -> Option<Gpu> {
+pub(crate) fn gpu_facts_from(program: &str) -> Option<Gpu> {
     let mut command = quiet(program);
     command.args([
         "--query-gpu=name,memory.total,memory.free,temperature.gpu,utilization.gpu",
