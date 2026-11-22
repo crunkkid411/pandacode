@@ -41,10 +41,8 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
   const loadSchedules = useAppStore((s) => s.loadSchedules)
   const agents = useAppStore((s) => s.agents)
 
-  const handleClick = () => {
-    setEditingScheduleId(schedule.id)
-    setScheduleSheetOpen(true)
-  }
+  // Hub: no edit sheet; Windows tasks are changed in Task Scheduler.
+  const handleClick = () => { void setEditingScheduleId; void setScheduleSheetOpen }
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -93,7 +91,7 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
           <span className={`text-[10px] font-600 uppercase tracking-wider px-2 py-0.5 rounded-[6px] ${statusClass}`}>
             {schedule.status}
           </span>
-          {!inSidebar && (
+          {/* Hub: no delete */ false && (
             <button
               onClick={handleDelete}
               className="text-text-3/40 hover:text-red-400 transition-colors p-0.5"
@@ -107,7 +105,7 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
         </div>
       </div>
       <div className="text-[12px] text-text-3/70 mt-1.5 truncate">
-        Runs on {agent?.name || 'Unknown agent'} &middot; {schedule.scheduleType}
+        {/* Hub: Windows tasks have no agent */}{agent ? <>Runs on {agent.name} &middot; </> : null}{schedule.scheduleType}
         {!inSidebar && schedule.scheduleType === 'cron' && schedule.cron && (
           <span className="text-text-3/50 ml-1" title={schedule.cron}>({cronToHuman(schedule.cron)})</span>
         )}
@@ -130,7 +128,7 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
             />
             <span className="truncate">Created by {creatorAgent.name}</span>
           </InfoChip>
-        ) : (
+        ) : !schedule.agentId ? null : (
           <InfoChip tone="muted" className="max-w-full">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="8" r="4" />

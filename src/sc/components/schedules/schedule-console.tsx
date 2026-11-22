@@ -544,9 +544,7 @@ export function ScheduleConsole() {
                 <SectionHeader label="Schedule Console" count={scopeCount} className="mb-2" />
                 <div className="flex flex-wrap gap-2">
                   <FilterPill label="Live" active={scope === 'live'} onClick={() => setScope('live')} />
-                  <FilterPill label="Archived" active={scope === 'archived'} onClick={() => setScope('archived')} />
-                  <FilterPill label="Runs" active={scope === 'runs'} onClick={() => setScope('runs')} />
-                  <FilterPill label="History" active={scope === 'history'} onClick={() => setScope('history')} />
+                  {/* Hub: Archived, Runs and History have no source on Jordan's PC yet */}
                 </div>
               </div>
               <div className="w-full lg:max-w-[360px]">
@@ -803,8 +801,7 @@ export function ScheduleConsole() {
                 return (
                   <div
                     key={schedule.id}
-                    onClick={() => { if (scope === 'live') openSchedule(schedule.id) }}
-                    className={`w-full text-left px-5 py-4 hover:bg-white/[0.02] transition-colors ${scope === 'live' ? 'cursor-pointer' : 'cursor-default'}`}
+                    className="w-full text-left px-5 py-4 hover:bg-white/[0.02] transition-colors cursor-default"
                     style={{ fontFamily: 'inherit' }}
                   >
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -862,10 +859,7 @@ export function ScheduleConsole() {
                                 {schedule.status === 'active' ? 'Pause' : 'Resume'}
                               </ActionButton>
                             )}
-                            <ActionButton disabled={isBusy} onClick={() => openSchedule(schedule.id)}>Edit</ActionButton>
-                            <ActionButton tone="danger" disabled={isBusy} onClick={() => handleArchive(schedule.id)}>
-                              {isBusy ? 'Archiving...' : 'Archive'}
-                            </ActionButton>
+                            {/* Hub: Edit and Archive hidden; Windows tasks are changed in Task Scheduler */}
                           </>
                         )}
                       </div>

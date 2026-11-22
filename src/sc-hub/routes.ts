@@ -105,7 +105,49 @@ async function usage(call: Call, range: string) {
   return { records: [], totalTokens, totalCost, byAgent, byProvider, timeSeries: [...series.values()].sort((x, y) => x.bucket.localeCompare(y.bucket)) };
 }
 
+interface HubTask { path: string; name: string; enabled: boolean; state: string; lastRun: string; lastResult: number; nextRun: string; action: string; mine: boolean }
+
+/** SwarmClaw puts a schedule's id straight into its URLs, so a task's path becomes a URL-safe id. */
+const taskId = (path: string) => 'task-' + path.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const taskPaths = new Map<string, string>();
+const when = (s: string) => { const t = Date.parse(s); return Number.isFinite(t) && t > Date.UTC(2000, 0, 1) ? t : undefined; };
+
+/** Every non-Microsoft Windows scheduled task (J10), his own first, as SwarmClaw schedules. */
+async function schedules(call: Call) {
+  const facts = await call<{ tasks: HubTask[] }>('hub_running_now');
+  const out: Record<string, unknown> = {};
+  for (const t of [...facts.tasks].sort((a, b) => Number(b.mine) - Number(a.mine))) {
+    const id = taskId(t.path);
+    taskPaths.set(id, t.path);
+    const ran = when(t.lastRun);
+    out[id] = {
+      id, name: t.name, agentId: '', taskPrompt: t.action || t.path, description: t.path,
+      // ponytail: SwarmClaw prints an unknown type as-is; we don't read trigger details yet.
+      scheduleType: 'Windows task', status: t.enabled ? 'active' : 'paused',
+      lastRunAt: ran, nextRunAt: when(t.nextRun),
+      lastDeliveryStatus: ran === undefined || t.lastResult === 0x41301 ? null : t.lastResult === 0 ? 'ok' : 'error',
+      lastDeliveredAt: ran, lastDeliveryError: t.lastResult ? `Windows result 0x${t.lastResult.toString(16)}` : null,
+      createdAt: 0,
+    };
+  }
+  return out;
+}
+
+const pathOf = (id: string) => {
+  const path = taskPaths.get(id);
+  if (!path) throw new Error('That task is no longer listed. Refresh the page.');
+  return path;
+};
+
 export const routes: Route[] = [
+  { method: 'GET', path: /^\/schedules$/, run: ({ call }) => schedules(call) },
+  { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => { await call('hub_task_run_now', { path: pathOf(match[1]) }); return { ok: true, queued: true }; } },
+  { method: 'PUT', path: /^\/schedules\/([^/]+)$/, run: async ({ call, match, body }) => {
+    const status = (body as { status?: string } | null)?.status;
+    if (status !== 'active' && status !== 'paused') throw new Error('Only turning a task on or off is supported here.');
+    await call('hub_task_set_enabled', { path: pathOf(match[1]), enabled: status === 'active' });
+    return { ok: true };
+  } },
   { method: 'GET', path: /^\/auth$/, run: async () => ({ authenticated: true }) },
   { method: 'POST', path: /^\/auth$/, run: async () => ({ ok: true }) },
   { method: 'GET', path: /^\/settings$/, run: async () => ({ userName: 'Jordan', setupCompleted: true }) },

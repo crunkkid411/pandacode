@@ -10,7 +10,7 @@ const open = (page: Page, path: string) => page.goto(`/hub.html#${path}`);
 test('sidebar shows only SwarmClaw pages that have real data, with SwarmClaw names', async ({ page }) => {
   await open(page, '/org-chart');
   for (const name of ['Org Chart', 'Skills', 'Providers', 'Usage', 'Style Guide']) await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
-  for (const hidden of ['Inbox', 'Wallets', 'Secrets', 'Marketplace', 'Execution', 'Star on GitHub', 'Join Discord']) await expect(page.getByText(hidden, { exact: true })).toHaveCount(0);
+  for (const hidden of ['Inbox', 'Wallets', 'Secrets', 'Marketplace', 'Star on GitHub', 'Join Discord']) await expect(page.getByText(hidden, { exact: true })).toHaveCount(0);
 });
 
 test('an unwired page address goes back to the Org Chart', async ({ page }) => {
@@ -51,4 +51,17 @@ test('style guide: the sidebar button opens it with one command', async ({ page 
   await open(page, '/org-chart');
   await page.getByRole('button', { name: 'Style Guide' }).click();
   await expect.poll(async () => (await calls(page, 'hub_open_style_guide')).length).toBe(1);
+});
+
+test('schedules: Windows tasks show, his own first; Run Now and Pause send the real task action', async ({ page }) => {
+  await open(page, '/schedules');
+  await expect(page.getByText('Becky Stars Refresh').first()).toBeVisible();
+  await expect(page.getByText('delivery error').first()).toBeVisible(); // Stars Refresh last result 1
+  for (const hollow of ['Archived', 'History', 'Edit', 'Archive']) await expect(page.getByRole('button', { name: hollow, exact: true })).toHaveCount(0);
+  const row = page.locator('div.w-full.text-left').filter({ hasText: 'Becky Stars Refresh' });
+  await row.getByRole('button', { name: 'Run Now' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\Becky Stars Refresh']);
+  await row.getByRole('button', { name: 'Pause' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_task_set_enabled')).map(c => c.args)).toEqual([{ path: '\\Becky Stars Refresh', enabled: false }]);
+  await page.screenshot({ path: process.env.HUB_SHOT_DIR ? `${process.env.HUB_SHOT_DIR}/sc-schedules.png` : 'test-results/sc-schedules.png' });
 });
