@@ -81,6 +81,10 @@ impl OnnxProfiler {
             // No arena and no memory pattern: freed tensors go back to the system instead of
             // staying reserved for the process.
             .and_then(|b| Ok(b.with_memory_pattern(false)?))
+            // x64 processors without AVX-VNNI / AVX-512 (Jordan's i7-10750H) return quietly wrong
+            // int8 results without this: job-type accuracy 40.4% -> 66.6% on the project's own test
+            // set (docs/panda-router-findings-windows-x64.md). No effect on ARM.
+            .and_then(|b| Ok(b.with_config_entry("session.x64quantprecision", "1")?))
             .and_then(|b| Ok(b.with_execution_providers([ort::ep::CPU::default().with_arena_allocator(false).build()])?))
             .and_then(|mut b| b.commit_from_memory(&model))
             .map_err(|e| format!("cannot load model.int8.onnx: {e}"))?;

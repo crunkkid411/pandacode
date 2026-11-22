@@ -24,7 +24,8 @@ fn panda_onnx() {
     println!("cargo:rustc-check-cfg=cfg(panda_onnx)");
     let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-    if matches!((os.as_str(), arch.as_str()), ("macos" | "linux" | "windows", "aarch64")) {
+    // Jordan's fork adds x86_64 Windows (his processor has the AVX2 the prebuilt runtime needs).
+    if matches!((os.as_str(), arch.as_str()), ("macos" | "linux" | "windows", "aarch64") | ("windows", "x86_64")) {
         println!("cargo:rustc-cfg=panda_onnx");
     }
 }

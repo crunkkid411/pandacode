@@ -1,7 +1,7 @@
-import { AlertTriangle, Bot, Loader, MessageSquarePlus, Send, Square, X } from 'lucide-react';
+import { AlertTriangle, Bot, Loader, MessageSquarePlus, Send, Sparkles, Square, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { call } from '../bridge';
-import { CHAT_TONE, chatState, speaker, visibleChats, type Chat, type ChatMessage, type ChatState, type MessagePage, type Provider } from './chats-facts';
+import { CHAT_TONE, chatState, routePool, speaker, visibleChats, type ProviderModel, type RouteResult, type Chat, type ChatMessage, type ChatState, type MessagePage, type Provider } from './chats-facts';
 import type { Tone } from './facts';
 
 // Chats panel: PandaCode's own chats (Claude Code, OpenCode...) with SwarmClaw's look.
@@ -72,8 +72,51 @@ export function Chats() {
     setSelected([made.id]);
   });
 
+  // Ask: the router (Panda Router, on this PC) picks the agent and model; the chat starts with the words.
+  const [ask, setAsk] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const submitAsk = async () => {
+    const text = ask.trim();
+    if (!text || asking) return;
+    setAsking(true);
+    await act(async () => {
+      // Asked before the agent list loaded: load it now rather than doing nothing.
+      const agents = providers.length ? providers : (await call<Provider[]>('list_providers')).filter(x => x.installed);
+      if (agents.length === 0) throw new Error('No agent is installed');
+      // An agent still discovering its models says so; ask it once more after a moment.
+      const models = (provider: string) => call<ProviderModel[]>('list_provider_models', { provider })
+        .catch(() => new Promise(r => setTimeout(r, 1500)).then(() => call<ProviderModel[]>('list_provider_models', { provider })))
+        .catch(() => [] as ProviderModel[]);
+      const lists = await Promise.all(agents.map(async p => ({ provider: p.id, models: await models(p.id) })));
+      const route = await call<RouteResult>('model_routing_route', { text, pool: routePool(lists) }).catch(() => null);
+      const pick = route?.pick ?? null;
+      const provider = pick?.provider ?? agents[0].id;
+      const made = await call<Chat>('chat_create', { provider, model: pick?.model ?? 'default', mode: 'full' });
+      await call('send_message', { sessionId: made.id, text });
+      const agent = agents.find(p => p.id === provider)?.name ?? provider;
+      setPicked(pick ? `${pick.name} in ${agent}` : `${agent} (no rated model fit)`);
+      setAsk('');
+      setOpen(made.id);
+      setSelected([made.id]);
+    });
+    setAsking(false);
+  };
+
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
+      <form aria-label="Ask" onSubmit={e => { e.preventDefault(); void submitAsk(); }} className="flex items-center gap-3 border-b border-border-hi px-6 py-4">
+        <Sparkles size={22} className="shrink-0 text-accent-bright" />
+        <input aria-label="What do you want done?" value={ask} onChange={e => setAsk(e.target.value)} disabled={asking}
+          placeholder="Say what you want done. The best agent for it starts on it."
+          className="min-w-0 flex-1 rounded-xl border border-border-hi bg-surface px-4 py-2.5 text-[17px] text-text outline-none focus:border-accent" />
+        <button type="submit" disabled={asking || !ask.trim()}
+          className="flex cursor-pointer items-center gap-2 rounded-xl border-none bg-accent px-5 py-2.5 text-[17px] font-semibold text-white disabled:cursor-default disabled:opacity-40">
+          {asking ? <Loader size={18} className="animate-spin" /> : <Send size={18} />}Ask
+        </button>
+        {picked && <span role="status" title="The agent and model the router picked" className="max-w-[30%] truncate text-[15px] text-text-2">{picked}</span>}
+      </form>
+      <div className="flex min-h-0 flex-1">
       <section aria-label="Chats list" className="flex w-[320px] shrink-0 flex-col border-r border-border-hi">
         <div className="flex flex-wrap gap-2 p-4">
           {providers.map(p => (
@@ -109,6 +152,7 @@ export function Chats() {
       {open && chats.some(c => c.id === open)
         ? <Conversation chat={chats.find(c => c.id === open)!} act={act} />
         : <p className="m-auto text-text-3">Pick a chat, or start one with a button on the left.</p>}
+      </div>
     </div>
   );
 }
@@ -123,7 +167,8 @@ function Conversation({ chat, act }: { chat: Chat; act: (work: () => Promise<unk
     try { setPage((await call<MessagePage>('get_messages', { sessionId: chat.id })).messages); } catch { /* the list's error line covers a lost backend */ }
   }, [chat.id]);
   useEffect(() => { setPage([]); void read(); }, [read]);
-  useEffect(() => whenVisible(state === 'working' ? OPEN_BUSY_MS : LIST_MS, () => void read()), [read, state]);
+  // Read at once when the chat changes state (the answer shows the moment it finishes), then on a timer.
+  useEffect(() => { void read(); return whenVisible(state === 'working' ? OPEN_BUSY_MS : LIST_MS, () => void read()); }, [read, state]);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [page.length]);
 
   const send = () => {
@@ -144,7 +189,8 @@ function Conversation({ chat, act }: { chat: Chat; act: (work: () => Promise<unk
       <ol aria-label="Messages" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
         {page.map(m => {
           const who = speaker(m.role);
-          if (who === 'note') return <li key={m.id} className="self-center text-[13px] text-text-3" title={m.content}>{m.role}</li>;
+          if (who === 'note') return m.content ? <li key={m.id} className="self-center text-[13px] text-text-3" title={m.content}>{m.role}</li> : null;
+          if (who === 'error') return <li key={m.id} role="alert" className="flex max-w-[80%] items-start gap-2 self-start rounded-2xl border border-danger bg-danger-soft px-4 py-3 text-[16px] text-danger"><AlertTriangle size={18} className="mt-1 shrink-0" />{m.content}</li>;
           return (
             <li key={m.id} className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-[16px] leading-relaxed ${who === 'me' ? 'self-end bg-accent text-white' : 'self-start border border-border-hi bg-surface'}`}>
               {m.content}

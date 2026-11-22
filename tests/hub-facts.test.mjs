@@ -55,6 +55,8 @@ test('chats: newest activity first, no drafts or archived', () => {
   assert.deepEqual(visibleChats([c('old', 10), c('new', 30), c('mid', 20), c('gone', 99, { archived: true }), c('draft', 98, { draft: true })]).map(x => x.id), ['new', 'mid', 'old']);
   assert.equal(speaker('user'), 'me');
   assert.equal(speaker('assistant'), 'agent');
+  assert.equal(speaker('error'), 'error');
+  assert.equal(speaker('changes'), 'note');
   assert.equal(speaker('changes'), 'note');
 });
 
@@ -79,4 +81,25 @@ test('next run reads as a short countdown', () => {
   assert.equal(untilText(now + 5 * 60_000, now), 'in 5 min');
   assert.equal(untilText(now + 3 * 3_600_000, now), 'in 3 h');
   assert.equal(untilText(now + 3 * 86_400_000, now), 'in 3 d');
+});
+
+import { routePool } from '../src/hub/chats-facts.ts';
+
+test('the router chooses from real models only, a fair share per agent', () => {
+  const many = Array.from({ length: 20 }, (_, i) => ({ id: `freellmapi/m${i}`, name: `M${i}` }));
+  const pool = routePool([{ provider: 'claude', models: [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] }, { provider: 'opencode', models: many }], 12);
+  assert.deepEqual(pool[0], { provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5' });
+  assert.equal(pool.filter(p => p.provider === 'claude').length, 1);
+  assert.equal(pool.filter(p => p.provider === 'opencode').length, 12);
+  assert.deepEqual(routePool([]), []);
+});
+
+test('the router never gets a paid model: only sign-in agents or free models', () => {
+  const pool = routePool([
+    { provider: 'hermes', models: [{ id: 'openrouter:anthropic/claude-opus-5.5', name: 'Opus' }, { id: 'openrouter:dots/x:free', name: 'Dots free' }] },
+    { provider: 'kilo', models: [{ id: 'openrouter/anthropic/claude-fable-5', name: 'Fable' }] },
+    { provider: 'antigravity', models: [{ id: 'gemini-3.8-flash', name: 'Gemini Flash' }] },
+    { provider: 'codex', models: [{ id: 'gpt-6-luna', name: 'GPT-6 Luna' }] },
+  ]);
+  assert.deepEqual(pool.map(p => p.model), ['openrouter:dots/x:free', 'gpt-6-luna']);
 });

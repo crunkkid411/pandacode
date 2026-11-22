@@ -26,9 +26,33 @@ export function visibleChats(chats: Chat[]): Chat[] {
   return chats.filter(c => !c.archived && !c.draft).sort((a, b) => last(b) - last(a));
 }
 
-/** Who wrote a message: Jordan, the agent, or a quiet system line. */
-export function speaker(role: string): 'me' | 'agent' | 'note' {
+/** Who wrote a message: Jordan, the agent, an error he must read, or a quiet system line. */
+export function speaker(role: string): 'me' | 'agent' | 'error' | 'note' {
   if (role === 'user') return 'me';
   if (role === 'assistant') return 'agent';
+  if (role === 'error') return 'error';
   return 'note';
+}
+
+export interface ProviderModel { id: string; name: string }
+export interface PoolEntry { provider: string; model: string; name: string }
+export interface RoutedModel { provider: string; model: string; name: string; pSuccess: number }
+export interface RouteResult { pick: RoutedModel | null; difficulty: number; category: string; profiler: 'onnx' | 'heuristic' }
+
+/** Agents that run on Jordan's sign-in subscriptions, never on a paid API key ("NEVER SPEND
+ * JORDAN'S MONEY. FREE OR OAUTH, NOTHING ELSE."). Other agents count only for free models. */
+// ponytail: Antigravity is a sign-in agent too, but its ACP server lacks the HTTP MCP support
+// PandaCode chats need ("does not advertise HTTP MCP support", seen 2026-11-22); add it back once it has it.
+export const SIGN_IN_AGENTS = ['claude', 'codex'];
+/** A model that costs nothing whichever agent runs it. */
+export const freeModel = (id: string) => /:free$/.test(id) || id.startsWith('freellmapi/');
+
+/** The models the router may choose from: each installed agent's real models (not its
+ * "default" alias), only free or sign-in ones, at most `perAgent` each so one long
+ * catalogue does not crowd out the rest. */
+export function routePool(lists: { provider: string; models: ProviderModel[] }[], perAgent = 12): PoolEntry[] {
+  return lists.flatMap(({ provider, models }) => models
+    .filter(m => m.id && m.id !== 'default' && (SIGN_IN_AGENTS.includes(provider) || freeModel(m.id)))
+    .slice(0, perAgent)
+    .map(m => ({ provider, model: m.id, name: m.name || m.id })));
 }

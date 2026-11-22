@@ -202,3 +202,36 @@ test('tools: picking nothing starts nothing', async ({ page }) => {
   await expect(page.getByText('Nothing yet. Click a tool above and pick a file.')).toBeVisible();
   expect(await calls(page, 'hub_tool_run')).toEqual([]);
 });
+
+test('ask: the router picks the agent and model, and the chat starts with the words', async ({ page }) => {
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
+  await page.getByRole('textbox', { name: 'What do you want done?' }).fill('Fix the login bug');
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page.getByRole('status')).toHaveText('Sonnet 5.5 in Claude Code');
+  const route = (await calls(page, 'model_routing_route'))[0].args;
+  expect(route.text).toBe('Fix the login bug');
+  expect(route.pool).toEqual([{ provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }, { provider: 'opencode', model: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }]);
+  expect((await calls(page, 'chat_create')).at(-1)!.args).toEqual({ provider: 'claude', model: 'claude-sonnet-5-5', mode: 'full' });
+  expect((await calls(page, 'send_message')).at(-1)!.args.text).toBe('Fix the login bug');
+  await expect(page.getByRole('textbox', { name: 'What do you want done?' })).toHaveValue('');
+});
+
+test('ask: with no rated model it still starts the first agent', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubNoRoute = true; });
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
+  await page.getByRole('textbox', { name: 'What do you want done?' }).fill('Hello');
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page.getByRole('status')).toHaveText('Claude Code (no rated model fit)');
+  expect((await calls(page, 'chat_create')).at(-1)!.args).toEqual({ provider: 'claude', model: 'default', mode: 'full' });
+});
+
+test('chats: an agent error shows in red with its real words; empty system lines are hidden', async ({ page }) => {
+  await page.goto('/hub.html');
+  await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chats' }).click();
+  await page.getByRole('textbox', { name: 'What do you want done?' }).fill('FAIL');
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'This harness cannot run here.' })).toBeVisible();
+  await expect(page.getByText('changes', { exact: true })).toHaveCount(0);
+});

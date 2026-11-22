@@ -58,7 +58,9 @@ libm = "0.2"
 # on Ubuntu 22.04), and the x86_64 Windows one is built with /arch:AVX2 (its .CRT$XCU static initializers
 # execute BMI2 instructions before main(), crashing with 0xc000001d on pre-AVX2 CPUs). Keep this
 # predicate in step with `panda_onnx` in build.rs; other targets route with the keyword heuristic.
-[target.'cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "aarch64"), all(target_os = "windows", target_arch = "aarch64")))'.dependencies]
+# Jordan's fork: x86_64 Windows too. His i7-10750H has AVX2/BMI2, so the AVX2-built runtime runs; this
+# build is only for his PC (docs/panda-router-findings-windows-x64.md).
+[target.'cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "aarch64"), all(target_os = "windows", any(target_arch = "aarch64", target_arch = "x86_64"))))'.dependencies]
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
 tokenizers = { version = "0.22.2", default-features = false, features = ["fancy-regex"] }
 

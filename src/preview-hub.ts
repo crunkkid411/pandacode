@@ -42,6 +42,8 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
     case 'list_sessions': return chats.map(c => ({ ...c }));
     case 'list_providers': return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }];
     case 'get_messages': return { messages: (messages[args.sessionId] ?? []).map(m => ({ ...m })), hasOlder: false };
+    case 'list_provider_models': return args.provider === 'claude' ? [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] : [{ id: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }];
+    case 'model_routing_route': return w.__hubNoRoute ? { pick: null, difficulty: 3, category: 'implementation', profiler: 'onnx' } : { pick: { provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5', pSuccess: 0.8 }, difficulty: 5, category: 'implementation', profiler: 'onnx' };
     case 'chat_create': {
       const c: Chat = { id: `c${nextId++}`, title: 'New chat', provider: args.provider, model: args.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null };
       chats.push(c);
@@ -54,6 +56,7 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       c.status = 'running';
       c.lastPromptAt = Date.now();
       // The agent answers after a moment, unless a test holds it running.
+      if (args.text === 'FAIL') { messages[c.id].push({ id: nextId++, role: 'error', content: 'This harness cannot run here.', createdAt: Date.now() }, { id: nextId++, role: 'changes', content: '', createdAt: Date.now() }); c.status = 'error'; return undefined; }
       if (!w.__hubHoldRunning) setTimeout(() => { messages[c.id].push({ id: nextId++, role: 'assistant', content: `Done: ${args.text}`, createdAt: Date.now() }); c.status = 'idle'; c.lastResponseAt = Date.now(); }, 300);
       return undefined;
     }

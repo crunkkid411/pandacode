@@ -4080,6 +4080,9 @@ pub fn run() {
                     send_message,
                     stop_session,
                     chats::chat_create,
+                    // Ask box: Panda Router picks the agent and model for a typed job.
+                    list_provider_models,
+                    model_routing::model_routing_route,
                     // Agents panel: PandaCode's bots and scheduled chats.
                     bots::bots_list,
                     bots::bot_set_paused,
