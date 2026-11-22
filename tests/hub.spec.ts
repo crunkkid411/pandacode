@@ -67,3 +67,14 @@ test('a graphics card that does not answer shows a red question mark, not a numb
   await expect(gpu).toContainText('?');
   await expect(page.getByRole('group', { name: 'Graphics card heat' })).toHaveCount(0);
 });
+
+test('other apps\' tasks sit in a closed fold below his own, and still work', async ({ page }) => {
+  await page.goto('/hub.html');
+  const mine = page.getByRole('list', { name: 'Scheduled tasks' });
+  await expect(mine.getByRole('listitem')).toHaveCount(4);
+  const others = page.getByRole('list', { name: "Other apps' tasks" });
+  await expect(others).toBeHidden();
+  await page.getByText('Other apps').click();
+  await others.getByRole('button', { name: 'Run AppleSoftwareUpdate now' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\AppleSoftwareUpdate']);
+});

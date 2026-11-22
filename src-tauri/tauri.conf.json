@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PandaCode",
+  "productName": "PandaCode Hub",
   "version": "0.3.100",
-  "identifier": "ai.pandacode.desktop",
+  "identifier": "ai.pandacode.hub",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -68,7 +68,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM3OEQ0RkYwQ0I4QzRGODEKUldTQlQ0ekw4RStOTnhNYW9jL1pTZENocVU3TGNPeVVxcDdzdkN4d0s3R2lPekxGRitGLzVwM3oK",
       "endpoints": [
-        "https://github.com/aicodeking/pandacode/releases/latest/download/latest.json"
+        "https://github.com/crunkkid411/pandacode/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

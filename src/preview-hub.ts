@@ -4,10 +4,11 @@
 import type { RunningNowFacts, Task } from './hub/facts';
 
 const tasks: Task[] = [
-  { path: '\\Becky Playlist Scout (idle)', name: 'Becky Playlist Scout (idle)', enabled: true, state: 'Ready', lastRun: '11/22/2026 3:10:00 AM', lastResult: 0, nextRun: '11/22/2026 7:10:00 AM', action: 'wscript run-hidden.vbs' },
-  { path: '\\Becky Stars Refresh', name: 'Becky Stars Refresh', enabled: true, state: 'Ready', lastRun: '11/22/2026 6:30:01 AM', lastResult: 1, nextRun: '11/23/2026 6:30:00 AM', action: 'powershell -File daily-run.ps1' },
-  { path: '\\Agent Branch Sweep', name: 'Agent Branch Sweep', enabled: false, state: 'Disabled', lastRun: '11/21/2026 9:00:00 PM', lastResult: 0, nextRun: 'N/A', action: 'bash agent-check.sh' },
-  { path: '\\MelancholyMonitor', name: 'MelancholyMonitor', enabled: true, state: 'Running', lastRun: '11/22/2026 6:40:00 AM', lastResult: 0x41301, nextRun: '11/22/2026 6:50:00 AM', action: 'wscript run-hidden.vbs' },
+  { path: '\\Becky Playlist Scout (idle)', name: 'Becky Playlist Scout (idle)', enabled: true, state: 'Ready', lastRun: '11/22/2026 3:10:00 AM', lastResult: 0, nextRun: '11/22/2026 7:10:00 AM', action: 'wscript run-hidden.vbs', mine: true },
+  { path: '\\Becky Stars Refresh', name: 'Becky Stars Refresh', enabled: true, state: 'Ready', lastRun: '11/22/2026 6:30:01 AM', lastResult: 1, nextRun: '11/23/2026 6:30:00 AM', action: 'powershell -File daily-run.ps1', mine: true },
+  { path: '\\Agent Branch Sweep', name: 'Agent Branch Sweep', enabled: false, state: 'Disabled', lastRun: '11/21/2026 9:00:00 PM', lastResult: 0, nextRun: 'N/A', action: 'bash agent-check.sh', mine: true },
+  { path: '\\MelancholyMonitor', name: 'MelancholyMonitor', enabled: true, state: 'Running', lastRun: '11/22/2026 6:40:00 AM', lastResult: 0x41301, nextRun: '11/22/2026 6:50:00 AM', action: 'wscript run-hidden.vbs', mine: true },
+  { path: '\\AppleSoftwareUpdate', name: 'AppleSoftwareUpdate', enabled: true, state: 'Ready', lastRun: '11/21/2026 1:00:00 PM', lastResult: 0, nextRun: '11/28/2026 1:00:00 PM', action: 'SoftwareUpdate.exe', mine: false },
 ];
 
 export function invokeHub<T>(command: string, args: Record<string, any>): T {
@@ -18,11 +19,11 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
       memory: { totalMb: 32604, freeMb: 14210 },
       gpu: w.__hubNoGpu ? null : { name: 'NVIDIA GeForce RTX 3070 Laptop GPU', totalMb: 8192, freeMb: 6011, tempC: 58, utilPct: 3 },
       processes: [
-        { pid: 4120, name: 'llama-server.exe', commandLine: 'llama-server -m d1-2B.gguf --port 8092', startedMs: Date.now() - 28 * 60_000, memMb: 512, kind: 'llm-server' },
-        { pid: 7311, name: 'claude.exe', commandLine: 'claude', startedMs: Date.now() - 90 * 60_000, memMb: 420, kind: 'agent' },
+        { pid: 4120, name: 'llama-server.exe', commandLine: 'llama-server -m d1-2B.gguf --port 8092', startedMs: Date.now() - 28 * 60_000, memMb: 512, kind: 'llm-server', label: 'llama-server' },
+        { pid: 7311, name: 'claude.exe', commandLine: 'claude', startedMs: Date.now() - 90 * 60_000, memMb: 420, kind: 'agent', label: 'claude' },
       ],
-      // Sorted by name, like hub.rs parse_schtasks_csv.
-      tasks: tasks.map(t => ({ ...t })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+      // His tasks first, then by name, like hub.rs parse_schtasks_csv.
+      tasks: tasks.map(t => ({ ...t })).sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
       tasksError: null,
       readAtMs: Date.now(),
     };

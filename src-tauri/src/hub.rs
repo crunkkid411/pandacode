@@ -41,6 +41,8 @@ pub struct Proc {
     pub mem_mb: u64,
     /// `llm-server` | `agent` | `helper`
     pub kind: String,
+    /// What to show: the script a python runs (`route.py`), else the program name.
+    pub label: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -57,6 +59,8 @@ pub struct Task {
     pub last_result: i64,
     pub next_run: String,
     pub action: String,
+    /// Made by this Windows user (Jordan or his agents), not by another app's installer.
+    pub mine: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -216,6 +220,7 @@ fn memory_and_processes(cache: &mut Cache) -> (Memory, Vec<Proc>) {
                 .join(" ");
             Some(Proc {
                 pid: p.pid().as_u32(),
+                label: process_label(&name, p.cmd()),
                 name,
                 command_line,
                 started_ms: p.start_time() * 1000,
@@ -251,7 +256,37 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     fields
 }
 
+/// Task Scheduler writes the author as `PC\user` or `user`.
+fn is_mine(author: &str, user: &str) -> bool {
+    let name = author.rsplit('\\').next().unwrap_or(author);
+    !user.is_empty() && name.eq_ignore_ascii_case(user)
+}
+
+/// `python X:\...\route.py --serve` shows as `route.py`; `python -m http.server` as
+/// `http.server`; anything else keeps its program name without `.exe`.
+fn process_label(name: &str, cmd: &[std::ffi::OsString]) -> String {
+    let program = name.strip_suffix(".exe").unwrap_or(name).to_string();
+    let args: Vec<String> = cmd.iter().skip(1).map(|a| a.to_string_lossy().into_owned()).collect();
+    let python = program.to_ascii_lowercase().starts_with("python");
+    if !python {
+        return program;
+    }
+    if let Some(i) = args.iter().position(|a| a == "-m") {
+        if let Some(module) = args.get(i + 1) {
+            return module.clone();
+        }
+    }
+    args.iter()
+        .find(|a| a.to_ascii_lowercase().ends_with(".py") || a.to_ascii_lowercase().ends_with(".pyw"))
+        .and_then(|a| a.rsplit(['\\', '/']).next().map(str::to_string))
+        .unwrap_or(program)
+}
+
 fn parse_schtasks_csv(text: &str) -> Vec<Task> {
+    parse_schtasks_csv_for(text, &std::env::var("USERNAME").unwrap_or_default())
+}
+
+fn parse_schtasks_csv_for(text: &str, user: &str) -> Vec<Task> {
     let mut header: Vec<String> = Vec::new();
     let mut tasks: Vec<Task> = Vec::new();
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
@@ -284,11 +319,13 @@ fn parse_schtasks_csv(text: &str) -> Vec<Task> {
             last_run: col("Last Run Time"),
             next_run: col("Next Run Time"),
             action: col("Task To Run"),
+            mine: is_mine(&col("Author"), &user),
             state,
             path,
         });
     }
-    tasks.sort_by_key(|t| t.name.to_ascii_lowercase());
+    // His own tasks first, then other apps' tasks; each group by name.
+    tasks.sort_by_key(|t| (!t.mine, t.name.to_ascii_lowercase()));
     tasks
 }
 
@@ -468,14 +505,14 @@ mod tests {
 
     #[test]
     fn tasks_list_excludes_microsoft() {
-        let tasks = parse_schtasks_csv(SAMPLE);
+        let tasks = parse_schtasks_csv_for(SAMPLE, "only1");
         assert_eq!(tasks.len(), 2, "{tasks:?}");
         assert!(tasks.iter().all(|t| !t.path.starts_with("\\Microsoft\\")));
     }
 
     #[test]
     fn tasks_keep_first_trigger_row_and_read_fields() {
-        let tasks = parse_schtasks_csv(SAMPLE);
+        let tasks = parse_schtasks_csv_for(SAMPLE, "only1");
         let stars = tasks.iter().find(|t| t.name == "Becky Stars Refresh").unwrap();
         assert!(stars.enabled);
         assert_eq!(stars.action, "powershell -File X:\\AI-2\\bots-dots\\daily-run.ps1");
@@ -483,6 +520,30 @@ mod tests {
         assert_eq!(sweep.path, "\\HubTest\\Agent Branch Sweep");
         assert!(!sweep.enabled);
         assert_eq!(sweep.last_result, -2147943467);
+    }
+
+    #[test]
+    fn his_tasks_come_first_and_other_apps_after() {
+        let csv = SAMPLE.replace(
+            "\"\\HubTest\\Agent Branch Sweep\",\"N/A\",\"Disabled\",\"x\",\"11/21/2026 9:00:00 PM\",\"-2147943467\",\"only1\"",
+            "\"\\HubTest\\Agent Branch Sweep\",\"N/A\",\"Disabled\",\"x\",\"11/21/2026 9:00:00 PM\",\"-2147943467\",\"Apple Inc.\"",
+        );
+        let tasks = parse_schtasks_csv_for(&csv, "only1");
+        assert_eq!(tasks.iter().map(|t| (t.name.as_str(), t.mine)).collect::<Vec<_>>(),
+            vec![("Becky Stars Refresh", true), ("Agent Branch Sweep", false)]);
+        assert!(is_mine("LAPTOP-1\\Only1", "only1"));
+        assert!(!is_mine("Microsoft Corporation", "only1"));
+        assert!(!is_mine("only1", ""));
+    }
+
+    #[test]
+    fn python_shows_the_script_it_runs() {
+        let cmd = |args: &[&str]| args.iter().map(std::ffi::OsString::from).collect::<Vec<_>>();
+        assert_eq!(process_label("python.exe", &cmd(&["python", "-I", "C:\\Users\\x\\route.py", "--serve"])), "route.py");
+        assert_eq!(process_label("pythonw.exe", &cmd(&["pythonw", "X:/a/b/bark-stt.pyw"])), "bark-stt.pyw");
+        assert_eq!(process_label("python.exe", &cmd(&["python", "-m", "http.server"])), "http.server");
+        assert_eq!(process_label("python.exe", &cmd(&["python"])), "python");
+        assert_eq!(process_label("llama-server.exe", &cmd(&["llama-server", "-m", "x.gguf"])), "llama-server");
     }
 
     #[test]

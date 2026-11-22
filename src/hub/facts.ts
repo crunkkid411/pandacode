@@ -3,8 +3,8 @@
 // action they ask the backend again (JOBS.md J10 rule 2). Tested by tests/hub-facts.test.mjs.
 export interface Memory { totalMb: number; freeMb: number }
 export interface Gpu { name: string; totalMb: number; freeMb: number; tempC: number; utilPct: number }
-export interface Proc { pid: number; name: string; commandLine: string; startedMs: number; memMb: number; kind: 'llm-server' | 'agent' | 'helper' }
-export interface Task { path: string; name: string; enabled: boolean; state: string; lastRun: string; lastResult: number; nextRun: string; action: string }
+export interface Proc { pid: number; name: string; commandLine: string; startedMs: number; memMb: number; kind: 'llm-server' | 'agent' | 'helper'; label: string }
+export interface Task { path: string; name: string; enabled: boolean; state: string; lastRun: string; lastResult: number; nextRun: string; action: string; mine: boolean }
 export interface RunningNowFacts { memory: Memory; gpu: Gpu | null; processes: Proc[]; tasks: Task[]; tasksError: string | null; readAtMs: number }
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'off';

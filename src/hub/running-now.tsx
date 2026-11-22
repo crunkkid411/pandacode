@@ -1,4 +1,4 @@
-import { Bot, Check, CircleHelp, Clock, Cpu, Loader, MemoryStick, Play, Thermometer, Wrench, X } from 'lucide-react';
+import { Bot, Check, CircleHelp, Clock, Cpu, Loader, MemoryStick, Package, Play, Thermometer, Wrench, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { call } from '../bridge';
 import { gb, heatTone, shortWhen, taskState, usedTone, type Proc, type RunningNowFacts, type Task, type TaskState, type Tone } from './facts';
@@ -76,7 +76,7 @@ function Programs({ processes }: { processes: Proc[] }) {
           <li key={p.pid} title={`${KIND_WORD[p.kind]} - running ${ago(p.startedMs)}\nPID ${p.pid}\n${p.commandLine}`}
             className="flex items-center gap-3 rounded-xl border border-border-hi bg-surface px-4 py-3">
             <Icon size={20} className={p.kind === 'llm-server' ? 'text-accent-bright' : 'text-text-2'} />
-            <span className="min-w-0 flex-1 truncate text-[16px]">{p.name.replace(/\.exe$/i, '')}</span>
+            <span className="min-w-0 flex-1 truncate text-[16px]">{p.label}</span>
             <span className="tabular-nums text-[15px] text-text-2">{p.memMb >= 1024 ? `${gb(p.memMb)} GB` : `${p.memMb} MB`}</span>
           </li>
         );
@@ -127,6 +127,23 @@ function Tasks({ tasks, tasksError, act }: { tasks: Task[]; tasksError: string |
   }
   const runSelected = () => act(async () => { for (const path of live) await call('hub_task_run_now', { path }); });
   const setSelectedEnabled = (enabled: boolean) => act(async () => { for (const path of live) await call('hub_task_set_enabled', { path, enabled }); });
+  const others = tasks.filter(t => !t.mine);
+  const row = (t: Task) => {
+    const look = STATE_LOOK[taskState(t)];
+    const isSelected = live.includes(t.path);
+    return (
+      <li key={t.path} aria-selected={isSelected} onClick={e => pick(e, t.path)}
+        className={`flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-2.5 ${isSelected ? 'border-accent bg-accent-soft' : 'border-border-hi bg-surface hover:bg-surface-2'}`}>
+        <Switch on={t.enabled} label={`${t.name} on or off`} onToggle={() => act(() => call('hub_task_set_enabled', { path: t.path, enabled: !t.enabled }))} />
+        <span role="img" aria-label={look.word} style={{ width: 20 }} title={`${look.word}\nLast run: ${t.lastRun}\nResult code: ${t.lastResult}`} className={TONE_TEXT[look.tone]}>{look.icon}</span>
+        <span title={`${t.path}\nRuns: ${t.action}`} className={`min-w-0 flex-1 truncate text-[16px] ${t.enabled ? '' : 'text-text-3'}`}>{t.name}</span>
+        <span title={`Next run: ${t.nextRun}`} className="hidden shrink-0 tabular-nums text-[15px] text-text-3 md:block">{shortWhen(t.nextRun)}</span>
+        <button type="button" aria-label={`Run ${t.name} now`} title="Run now"
+          onClick={e => { e.stopPropagation(); void act(() => call('hub_task_run_now', { path: t.path })); }}
+          className="rail-btn !h-9 !w-9 text-text-2 hover:!text-accent-bright"><Play size={18} /></button>
+      </li>
+    );
+  };
 
   return (
     <>
@@ -139,24 +156,17 @@ function Tasks({ tasks, tasksError, act }: { tasks: Task[]; tasksError: string |
         </div>
       )}
       <ul aria-label="Scheduled tasks" className="flex flex-col gap-1.5">
-        {tasks.map(t => {
-          const state = taskState(t);
-          const look = STATE_LOOK[state];
-          const isSelected = live.includes(t.path);
-          return (
-            <li key={t.path} aria-selected={isSelected} onClick={e => pick(e, t.path)}
-              className={`flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-2.5 ${isSelected ? 'border-accent bg-accent-soft' : 'border-border-hi bg-surface hover:bg-surface-2'}`}>
-              <Switch on={t.enabled} label={`${t.name} on or off`} onToggle={() => act(() => call('hub_task_set_enabled', { path: t.path, enabled: !t.enabled }))} />
-              <span role="img" aria-label={look.word} style={{ width: 20 }} title={`${look.word}\nLast run: ${t.lastRun}\nResult code: ${t.lastResult}`} className={TONE_TEXT[look.tone]}>{look.icon}</span>
-              <span title={`${t.path}\nRuns: ${t.action}`} className={`min-w-0 flex-1 truncate text-[16px] ${t.enabled ? '' : 'text-text-3'}`}>{t.name}</span>
-              <span title={`Next run: ${t.nextRun}`} className="hidden shrink-0 tabular-nums text-[15px] text-text-3 md:block">{shortWhen(t.nextRun)}</span>
-              <button type="button" aria-label={`Run ${t.name} now`} title="Run now"
-                onClick={e => { e.stopPropagation(); void act(() => call('hub_task_run_now', { path: t.path })); }}
-                className="rail-btn !h-9 !w-9 text-text-2 hover:!text-accent-bright"><Play size={18} /></button>
-            </li>
-          );
-        })}
+        {tasks.filter(t => t.mine).map(row)}
       </ul>
+      {others.length > 0 && (
+        // Other apps' tasks (Apple, Google, NVIDIA...) are rarely touched: folded (LESSONS.md section 4).
+        <details className="mt-3">
+          <summary title="Tasks other apps installed" className="flex cursor-pointer list-none items-center gap-2 py-2 text-text-3 hover:text-text-2">
+            <Package size={18} />Other apps <span className="tabular-nums">{others.length}</span>
+          </summary>
+          <ul aria-label="Other apps' tasks" className="mt-1.5 flex flex-col gap-1.5">{others.map(row)}</ul>
+        </details>
+      )}
     </>
   );
 }
