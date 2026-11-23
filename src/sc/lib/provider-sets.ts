@@ -12,8 +12,10 @@ export const RUNTIME_MANAGED_PROVIDER_IDS = new Set(['hermes', 'goose'])
 /** Providers with native tool/capability support (CLI providers + OpenClaw + Hermes). */
 export const NATIVE_CAPABILITY_PROVIDER_IDS = new Set([...CLI_PROVIDER_IDS, 'openclaw', 'hermes'])
 
-/** Providers that can only act as workers — no coordinator role, no heartbeat, no advanced settings. */
-export const WORKER_ONLY_PROVIDER_IDS = new Set([...CLI_PROVIDER_IDS, 'openclaw', 'hermes'])
+/** Providers that can only act as workers — no coordinator role, no heartbeat, no advanced settings.
+ *  Hub: empty. Agents are PandaCode bots, and a bot on any harness can lead a team (pandacode_bot_message_bot)
+ *  and check in on a timer. SwarmClaw's own list was [...CLI_PROVIDER_IDS, 'openclaw', 'hermes']. */
+export const WORKER_ONLY_PROVIDER_IDS = new Set<string>()
 
 /** CLI providers that support MCP server and skill injection at runtime (via provider-specific config mechanisms). */
 export const MCP_INJECTION_PROVIDER_IDS = new Set(['copilot-cli', 'codex-cli'])

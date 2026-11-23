@@ -1,8 +1,9 @@
 // What each SwarmClaw API path means on Jordan's PC. Every answer comes from a Hub Rust command.
-import type { Agent, ProviderInfo, Skill } from '../sc/types';
+import type { Agent, ProviderInfo, Schedule, Skill } from '../sc/types';
+import { botSchedules, createBotSchedule, preview, PREFIX, scheduleOwner, scSchedule } from './bot-schedules';
 import { work, type Ledger } from '../hub/usage-facts';
 import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
-import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, updateBotAgent } from './bot-agents';
+import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, pcProvider, scProvider, updateBotAgent } from './bot-agents';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 interface Ctx { call: Call; match: RegExpMatchArray; query: URLSearchParams; body: unknown }
@@ -111,7 +112,7 @@ async function skills(call: Call, command = 'hub_skills_list'): Promise<Record<s
 /** Agents installed on this PC, with the models each one offers. */
 async function providers(call: Call): Promise<ProviderInfo[]> {
   const list = await call<HubProvider[]>('list_providers');
-  return list.filter(p => p.installed).map(p => ({ id: p.id, name: p.name, models: (p.models ?? []).map(m => m.id), requiresApiKey: false, requiresEndpoint: false }));
+  return list.filter(p => p.installed).map(p => ({ id: scProvider(p.id) as ProviderInfo['id'], name: p.name, models: (p.models ?? []).map(m => m.id), requiresApiKey: false, requiresEndpoint: false }));
 }
 
 const RANGE_HOURS: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
@@ -227,7 +228,7 @@ export const routes: Route[] = [
   { method: 'POST', path: /^\/chats$/, run: async ({ call, body }) => {
     const b = (body ?? {}) as { provider?: string; model?: string };
     if (!b.provider) throw new Error('Pick an agent first.');
-    return chatSession(await call<Chat>('chat_create', { provider: b.provider, model: b.model || 'default', mode: 'full' }));
+    return chatSession(await call<Chat>('chat_create', { provider: pcProvider(b.provider), model: b.model || 'default', mode: 'full' }));
   } },
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-pack$/, run: async ({ call, match }) => {
     const c = await oneChat(call, match[1]);
@@ -238,12 +239,37 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ match }) => ({ sessionId: match[1], activeRunId: null, queueLength: 0, items: [] }) },
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-status$/, run: async () => null },
   { method: 'POST', path: /^\/agents\/([^/]+)\/thread$/, run: async ({ call, match }) => oneChat(call, await botThread(call, match[1])) },
-  { method: 'GET', path: /^\/schedules$/, run: ({ call }) => schedules(call) },
-  { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => { await call('hub_task_run_now', { path: pathOf(match[1]) }); return { ok: true, queued: true }; } },
+  // Schedules: his agents' own schedules (ids "bs-...") first, then his Windows tasks.
+  { method: 'GET', path: /^\/schedules$/, run: async ({ call }) => ({
+    ...Object.fromEntries((await botSchedules(call)).map(s => [PREFIX + s.id, scSchedule(s)])),
+    ...(await schedules(call)),
+  }) },
+  { method: 'POST', path: /^\/schedules\/preview$/, run: async ({ body }) => preview((body ?? {}) as Partial<Schedule>) },
+  { method: 'POST', path: /^\/schedules$/, run: ({ call, body }) => createBotSchedule(call, (body ?? {}) as Partial<Schedule>) },
+  { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => {
+    if (match[1].startsWith(PREFIX)) await call('bot_run_schedule_now', { scheduleId: match[1].slice(PREFIX.length) });
+    else await call('hub_task_run_now', { path: pathOf(match[1]) });
+    return { ok: true, queued: true };
+  } },
   { method: 'PUT', path: /^\/schedules\/([^/]+)$/, run: async ({ call, match, body }) => {
-    const status = (body as { status?: string } | null)?.status;
-    if (status !== 'active' && status !== 'paused') throw new Error('Only turning a task on or off is supported here.');
-    await call('hub_task_set_enabled', { path: pathOf(match[1]), enabled: status === 'active' });
+    const b = (body ?? {}) as Partial<Schedule>;
+    if (match[1].startsWith(PREFIX) && ('taskPrompt' in b || 'scheduleType' in b)) {
+      // The edit form: bots have no schedule edit, so save the new one, then remove the old one.
+      const own = await scheduleOwner(call, match[1].slice(PREFIX.length));
+      const made = await createBotSchedule(call, { ...b, agentId: b.agentId || own.botId });
+      if (b.status === 'paused') await call('bot_schedule_set_enabled', { scheduleId: made.id.slice(PREFIX.length), enabled: false });
+      await call('bot_schedule_delete', { botId: own.botId, scheduleId: own.id });
+      return made;
+    }
+    const status = b.status;
+    if (status !== 'active' && status !== 'paused') throw new Error('Only turning a schedule on or off is supported here.');
+    if (match[1].startsWith(PREFIX)) await call('bot_schedule_set_enabled', { scheduleId: match[1].slice(PREFIX.length), enabled: status === 'active' });
+    else await call('hub_task_set_enabled', { path: pathOf(match[1]), enabled: status === 'active' });
+    return { ok: true };
+  } },
+  { method: 'DELETE', path: /^\/schedules\/bs-([^/]+)$/, run: async ({ call, match }) => {
+    const own = await scheduleOwner(call, match[1]);
+    await call('bot_schedule_delete', { botId: own.botId, scheduleId: own.id });
     return { ok: true };
   } },
   { method: 'GET', path: /^\/auth$/, run: async () => ({ authenticated: true }) },

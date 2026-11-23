@@ -36,6 +36,28 @@ const bots: MockBot[] = [
   { ...profile, id: 'b3', name: 'Clip Finder', role: 'Finds clips in streams', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 0, nextHeartbeatAt: null, lastMessage: null, org: {} },
 ];
 const botById = (id: string) => { const b = bots.find(x => x.id === id); if (!b) throw new Error('This bot no longer exists.'); return b; };
+// Bot schedules (bots/schedule.rs): Chief of Staff checks the inbox every weekday at 08:15.
+const botSchedules: any[] = [
+  { id: 'k1', botId: 'b1', title: 'Weekday queue sweep', prompt: 'Sort the saved links by owner', kind: 'weekdays', intervalMinutes: null, timeOfDay: '08:15', nextRunAt: now + 5 * 3_600_000, lastRunAt: null, enabled: true, createdBy: 'user' },
+];
+function invokeBotSchedules(command: string, args: Record<string, any>): unknown {
+  const own = () => { const s = botSchedules.find(x => x.id === args.scheduleId); if (!s) throw new Error('This schedule no longer exists.'); return s; };
+  switch (command) {
+    case 'bot_detail': return { bot: { ...botById(args.botId) }, schedules: botSchedules.filter(s => s.botId === args.botId).map(s => ({ ...s })), memories: [], channels: [], pairings: [], threads: [], rules: [], serverPort: 0 };
+    case 'bot_schedule_create': {
+      const i = args.input;
+      if (!i.prompt) throw new Error('A schedule needs a prompt: what should the bot do?');
+      if (i.kind === 'interval' && !(i.intervalMinutes >= 5 && i.intervalMinutes <= 10080)) throw new Error('Check the schedule’s time: intervals are 5 minutes to a week, times are HH:MM, one-off runs are within a year.');
+      const s = { id: `k${nextId++}`, botId: botById(args.botId).id, title: i.title || i.prompt.slice(0, 60), prompt: i.prompt, kind: i.kind, intervalMinutes: i.intervalMinutes ?? null, timeOfDay: i.timeOfDay ?? null, nextRunAt: Date.now() + 3_600_000, lastRunAt: null, enabled: true, createdBy: 'user' };
+      botSchedules.push(s);
+      return { ...s };
+    }
+    case 'bot_schedule_set_enabled': { const s = own(); s.enabled = Boolean(args.enabled); return { ...s }; }
+    case 'bot_schedule_delete': { botSchedules.splice(botSchedules.indexOf(own()), 1); return undefined; }
+    case 'bot_run_schedule_now': { own().lastRunAt = Date.now(); return undefined; }
+  }
+  return null;
+}
 const schedules: HubSchedule[] = [
   { id: 's1', title: 'Morning news digest', sessionTitle: 'News', projectName: 'AI-2', prompt: 'Summarise AI news', kind: 'daily', intervalMinutes: null, timeOfDay: '07:30', days: [], watchSessionTitle: null, nextRunAt: now + 3 * 3_600_000, lastRunAt: now - 20 * 3_600_000, enabled: true, runCount: 12 },
   { id: 's2', title: 'Check the build', sessionTitle: 'Build', projectName: 'pandacode', prompt: 'Run the tests', kind: 'interval', intervalMinutes: 30, timeOfDay: null, days: [], watchSessionTitle: null, nextRunAt: now + 10 * 60_000, lastRunAt: now - 20 * 60_000, enabled: false, runCount: 3 },
@@ -128,6 +150,7 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   if (command === 'hub_voice_status') return { running: w.__hubVoice ?? null } as T;
   if (command === 'hub_voice_start') { if (w.__hubVoice && w.__hubVoice !== args.kind) throw new Error('Another voice is already on. Stop it first.'); w.__hubVoice = args.kind; return { running: args.kind } as T; }
   if (command === 'hub_voice_stop') { w.__hubVoice = null; return { running: null } as T; }
+  if (command === 'bot_detail' || command.startsWith('bot_schedule_') || command === 'bot_run_schedule_now') return invokeBotSchedules(command, args) as T;
   if (!command.startsWith('hub_')) return invokeChats(command, args) as T;
   if (command === 'hub_org') return [
     { pid: 11, sessionId: 's1', title: 'Build the Hub', cwd: 'X:/AI-2', status: 'busy', startedMs: Date.now() - 3600000, lastWords: 'Copying SwarmClaw pages', log: 'X:/log.jsonl',

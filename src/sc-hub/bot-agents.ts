@@ -17,11 +17,18 @@ export interface Bot {
 
 const isImage = (v: string) => v.startsWith('data:image/');
 
+// SwarmClaw's names for CLI harnesses (src/sc/lib/providers/cli-provider-metadata.ts) <-> PandaCode's.
+// Using SwarmClaw's names keeps its form's harness-specific parts (e.g. Claude skills) working.
+const SC_NAMES: Record<string, string> = { claude: 'claude-cli', codex: 'codex-cli', opencode: 'opencode-cli', gemini: 'gemini-cli', copilot: 'copilot-cli', cursor: 'cursor-cli', qwen: 'qwen-code-cli' };
+const PC_NAMES = Object.fromEntries(Object.entries(SC_NAMES).map(([pc, sc]) => [sc, pc]));
+export const scProvider = (pc: string) => SC_NAMES[pc] ?? pc;
+export const pcProvider = (sc: string) => PC_NAMES[sc] ?? sc;
+
 export function botAgent(b: Bot): Agent {
   const org = b.org ?? {};
   return {
     id: b.id, name: b.name, description: b.role, systemPrompt: b.instructions, soul: b.soul,
-    provider: b.provider as Agent['provider'], model: b.model,
+    provider: scProvider(b.provider) as Agent['provider'], model: b.model,
     emoji: b.avatar && !isImage(b.avatar) && !b.avatar.startsWith('panda:') ? b.avatar : undefined,
     avatarUrl: isImage(b.avatar) ? b.avatar : null, avatarSeed: b.id,
     role: org.swarmRole === 'coordinator' ? 'coordinator' : 'worker',
@@ -44,8 +51,7 @@ function input(base: Partial<Bot>, a: Partial<Agent>) {
   return {
     name: (a.name ?? base.name ?? '').trim(), role: a.description ?? base.role ?? '', instructions: a.systemPrompt ?? base.instructions ?? '',
     goals: a.heartbeatGoal ?? base.goals ?? '', soul: a.soul ?? base.soul ?? '', avatar,
-    // SwarmClaw names CLI harnesses "claude-cli", "codex-cli"...; PandaCode names them "claude", "codex".
-    provider: (a.provider ?? base.provider ?? 'claude').replace(/-cli$/, ''), model: a.model || base.model || 'default',
+    provider: a.provider ? pcProvider(a.provider) : base.provider ?? 'claude', model: a.model || base.model || 'default',
     // ponytail: new bots start in PandaCode's own default, "ask"; change it in PandaCode's bot settings.
     mode: base.mode ?? 'ask', heartbeatMinutes: minutes,
     color: base.color ?? '', reasoningEffort: a.thinkingLevel ?? base.reasoningEffort ?? '',

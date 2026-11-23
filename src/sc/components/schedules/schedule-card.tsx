@@ -41,8 +41,12 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
   const loadSchedules = useAppStore((s) => s.loadSchedules)
   const agents = useAppStore((s) => s.agents)
 
-  // Hub: no edit sheet; Windows tasks are changed in Task Scheduler.
-  const handleClick = () => { void setEditingScheduleId; void setScheduleSheetOpen }
+  // Hub: only agent schedules open the edit form; Windows tasks are changed in Task Scheduler.
+  const handleClick = () => {
+    if (!schedule.agentId) return
+    setEditingScheduleId(schedule.id)
+    setScheduleSheetOpen(true)
+  }
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -91,7 +95,7 @@ export function ScheduleCard({ schedule, inSidebar, index = 0 }: Props) {
           <span className={`text-[10px] font-600 uppercase tracking-wider px-2 py-0.5 rounded-[6px] ${statusClass}`}>
             {schedule.status}
           </span>
-          {/* Hub: no delete */ false && (
+          {/* Hub: delete only agent schedules */ !inSidebar && !!schedule.agentId && (
             <button
               onClick={handleDelete}
               className="text-text-3/40 hover:text-red-400 transition-colors p-0.5"

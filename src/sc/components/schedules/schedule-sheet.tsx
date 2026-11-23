@@ -464,6 +464,7 @@ export function ScheduleSheet() {
               </button>
               <button
                 onClick={() => setTaskMode('protocol')}
+                hidden /* Hub: bots have no structured sessions */
                 className={`py-3 px-4 rounded-[14px] text-center cursor-pointer transition-all duration-200
                   active:scale-[0.97] text-[14px] font-600 border
                   ${taskMode === 'protocol'
@@ -594,7 +595,7 @@ export function ScheduleSheet() {
                 <input type="text" value={cron} onChange={(e) => setCron(e.target.value)} placeholder="0 * * * *" className={`${inputClass} font-mono text-[14px] mb-3`} />
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3" style={{ display: 'none' }} /* Hub: bots run on this PC's clock, no stagger */>
                 <div>
                   <SectionLabel>Timezone</SectionLabel>
                   <input
@@ -633,7 +634,7 @@ export function ScheduleSheet() {
                 className={inputClass}
                 style={{ fontFamily: 'inherit' }}
               />
-              <div className="mt-3 mb-3">
+              <div className="mt-3 mb-3" style={{ display: 'none' }} /* Hub: no stagger on bot schedules */>
                 <SectionLabel>Stagger (seconds)</SectionLabel>
                 <input
                   type="number"

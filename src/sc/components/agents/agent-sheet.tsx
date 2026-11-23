@@ -649,7 +649,7 @@ export function AgentSheet() {
         setAutoRecovery(false)
         setDisabled(false)
         setVoiceId('')
-        setHeartbeatEnabled(true)
+        setHeartbeatEnabled(false) // Hub: a bot heartbeat runs a real turn every hour; off until he turns it on
         setHeartbeatIntervalSec('')
         setHeartbeatModel('')
         setHeartbeatPrompt('')
@@ -1289,7 +1289,7 @@ export function AgentSheet() {
               {uploading && <span className="text-[11px] text-text-3">Uploading...</span>}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ display: 'none' }} /* Hub: bots keep no avatar seed */>
             <input
               type="text"
               value={avatarSeed}
@@ -1326,7 +1326,7 @@ export function AgentSheet() {
         title="Model & Connection"
         description="Choose how this agent connects to a model, then verify the setup before saving."
       >
-      <div className="mb-8">
+      <div className="mb-8" style={{ display: 'none' }} /* Hub: no OpenClaw gateway; bots run on PandaCode's harnesses */>
         <div className="flex items-center justify-between gap-3 rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-3">
           <div>
             <p className="text-[12px] font-700 uppercase tracking-[0.08em] text-text-3">Runtime</p>
@@ -1900,8 +1900,8 @@ export function AgentSheet() {
                 : 'Executes tasks when prompted by users or other agents'}
             </p>
 
-            {/* Delegation toggle */}
-            <div className="mt-4">
+            {/* Delegation toggle. Hub: hidden; a bot delegates to the team under it on the Org Chart */}
+            <div className="mt-4" style={{ display: 'none' }}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <div
                   onClick={() => {
@@ -2050,7 +2050,7 @@ export function AgentSheet() {
             <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${heartbeatEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-4 mt-3">
+        <div className="flex items-center justify-between gap-4 rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-4 mt-3" style={{ display: 'none' }} /* Hub: bots have no dreaming */>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-[14px] font-600 text-text">Dreaming</p>
@@ -2119,7 +2119,7 @@ export function AgentSheet() {
         </SectionCard>
       )}
 
-      {(!WORKER_ONLY_PROVIDER_IDS.has(provider) || MCP_INJECTION_PROVIDER_IDS.has(provider)) && (
+      {/* Hub: none of the advanced settings are saved on a bot yet */ false && (!WORKER_ONLY_PROVIDER_IDS.has(provider) || MCP_INJECTION_PROVIDER_IDS.has(provider)) && (
       <AdvancedSettingsSection
         open={showAdvancedSettings}
         onToggle={() => setShowAdvancedSettings((current) => !current)}

@@ -62,7 +62,7 @@ test('schedules: Windows tasks show, his own first; Run Now and Pause send the r
   await open(page, '/schedules');
   await expect(page.getByText('Becky Stars Refresh').first()).toBeVisible();
   await expect(page.getByText('delivery error').first()).toBeVisible(); // Stars Refresh last result 1
-  for (const hollow of ['Archived', 'History', 'Edit', 'Archive']) await expect(page.getByRole('button', { name: hollow, exact: true })).toHaveCount(0);
+  for (const hollow of ['Archived', 'History']) await expect(page.getByRole('button', { name: hollow, exact: true })).toHaveCount(0);
   const row = page.locator('div.w-full.text-left').filter({ hasText: 'Becky Stars Refresh' });
   await row.getByRole('button', { name: 'Run Now' }).click();
   await expect.poll(async () => (await calls(page, 'hub_task_run_now')).map(c => c.args.path)).toEqual(['\\Becky Stars Refresh']);
@@ -96,9 +96,65 @@ test('agents: + Agent opens the SwarmClaw agent form and saves a new PandaCode b
   await page.getByRole('button', { name: 'Agent', exact: true }).click();
   await page.getByPlaceholder('e.g. SEO Researcher').fill('Thumbnail Maker');
   await page.getByPlaceholder('What does this agent do?').fill('Makes thumbnail ideas');
+  // Parts that would not be saved on a bot are not shown.
+  for (const hollow of ['OpenClaw', 'Can Delegate', 'Dreaming', 'Advanced Settings', 'Avatar seed (any text)']) await expect(page.getByText(hollow, { exact: true }).filter({ visible: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Claude Code', exact: true }).click();
+  await page.getByRole('button', { name: 'Coordinator', exact: true }).click();
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-form.png`, fullPage: true });
   await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
-  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.role])).toEqual([['Thumbnail Maker', 'Makes thumbnail ideas']]);
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.role, c.args.input.provider, c.args.input.heartbeatMinutes])).toEqual([['Thumbnail Maker', 'Makes thumbnail ideas', 'claude', 0]]);
+  await expect.poll(async () => (await calls(page, 'bot_set_org')).map(c => c.args.org.swarmRole)).toEqual(['coordinator']);
   await expect(page.getByText('Thumbnail Maker').first()).toBeVisible();
-  expect(['claude', 'opencode']).toContain((await calls(page, 'bot_create'))[0].args.input.provider); // a harness installed here
+});
+
+test('agents: Config tab edits an agent and saves it to the bot without moving it on the Org Chart', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'config', exact: true }).click();
+  await page.getByText('Morning brief', { exact: true }).first().click(); // the agent's card
+  const about = page.getByPlaceholder('What does this agent do?');
+  await expect(about).toHaveValue('Morning brief');
+  await about.fill('Morning brief and weekly plan');
+  await page.getByRole('button', { name: /^(Save|Test & Save)$/ }).click();
+  await expect.poll(async () => (await calls(page, 'bot_update')).map(c => [c.args.botId, c.args.input.role, c.args.input.heartbeatMinutes])).toEqual([['b1', 'Morning brief and weekly plan', 60]]);
+  const org = (await calls(page, 'bot_set_org')).map(c => c.args.org);
+  expect(org.every(o => o.onChart && o.parentId === null && o.swarmRole === 'coordinator')).toBe(true);
+});
+
+test('org chart: dragging an unplaced agent onto the chart saves its place on the bot', async ({ page }) => {
+  await open(page, '/org-chart');
+  const chip = page.getByText('Clip Finder', { exact: true }).first();
+  await expect(chip).toBeVisible();
+  await chip.dragTo(page.locator('body'), { targetPosition: { x: 900, y: 750 } });
+  await expect.poll(async () => (await calls(page, 'bot_set_org')).map(c => [c.args.botId, c.args.org.onChart])).toContainEqual(['b3', true]);
+});
+
+test('schedules: agent schedules show beside Windows tasks; Run Now, Pause and Delete reach the bot', async ({ page }) => {
+  await open(page, '/schedules');
+  await expect(page.getByText('Weekday queue sweep').first()).toBeVisible();
+  await expect(page.getByText('Becky Stars Refresh').first()).toBeVisible();
+  const row = page.locator('div.w-full.text-left').filter({ hasText: 'Weekday queue sweep' });
+  await row.getByRole('button', { name: 'Run Now' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_run_schedule_now')).map(c => c.args.scheduleId)).toEqual(['k1']);
+  await row.getByRole('button', { name: 'Pause' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_schedule_set_enabled')).map(c => c.args)).toEqual([{ scheduleId: 'k1', enabled: false }]);
+  await row.getByRole('button', { name: 'Delete' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_schedule_delete')).map(c => c.args)).toEqual([{ botId: 'b1', scheduleId: 'k1' }]);
+  await expect(page.getByText('Weekday queue sweep')).toHaveCount(0);
+  // Windows tasks still have no Edit or Delete.
+  const task = page.locator('div.w-full.text-left').filter({ hasText: 'Becky Stars Refresh' });
+  for (const hollow of ['Edit', 'Delete']) await expect(task.getByRole('button', { name: hollow, exact: true })).toHaveCount(0);
+});
+
+test('schedules: + Schedule makes a schedule for the chosen agent', async ({ page }) => {
+  await open(page, '/schedules');
+  await page.getByRole('button', { name: 'Schedule', exact: true }).first().click();
+  await page.getByText('Daily Digest', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Structured session' })).toHaveCount(0);
+  await page.getByText('Clip Finder', { exact: true }).last().click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-schedule-when.png` });
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: /^(Create|Save)/ }).last().click();
+  await expect.poll(async () => (await calls(page, 'bot_schedule_create')).map(c => [c.args.botId, c.args.input.title, c.args.input.kind])).toEqual([['b3', 'Daily Digest', 'daily']]);
+  await expect(page.getByText('Daily Digest').first()).toBeVisible();
 });

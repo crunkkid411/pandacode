@@ -4103,6 +4103,11 @@ pub fn run() {
                     bots::bot_message,
                     bots::bot_set_capabilities,
                     bots::bot_set_org,
+                    // SwarmClaw's Schedules page: each agent's own schedules.
+                    bots::schedule::bot_schedule_create,
+                    bots::schedule::bot_schedule_set_enabled,
+                    bots::schedule::bot_schedule_delete,
+                    bots::schedule::bot_run_schedule_now,
                     schedules::schedules_list,
                     schedules::schedule_set_enabled,
                     schedules::schedule_run_now,

@@ -421,8 +421,8 @@ export function ScheduleConsole() {
       const result = await archiveSchedule(scheduleId)
       await Promise.all([loadSchedules(), loadTasks()])
       const cancelledCount = Array.isArray(result.cancelledTaskIds) ? result.cancelledTaskIds.length : 0
-      toast.success(cancelledCount > 0 ? `Schedule archived and ${cancelledCount} task(s) cancelled` : 'Schedule archived')
-      if (scope === 'live') setScope('archived')
+      // Hub: agent schedules are deleted, not archived, so the live list stays open.
+      toast.success(cancelledCount > 0 ? `Schedule deleted and ${cancelledCount} task(s) cancelled` : 'Schedule deleted')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to archive schedule')
     } finally {
@@ -801,7 +801,8 @@ export function ScheduleConsole() {
                 return (
                   <div
                     key={schedule.id}
-                    className="w-full text-left px-5 py-4 hover:bg-white/[0.02] transition-colors cursor-default"
+                    onClick={() => { if (scope === 'live' && schedule.agentId) openSchedule(schedule.id) }}
+                    className={`w-full text-left px-5 py-4 hover:bg-white/[0.02] transition-colors ${scope === 'live' && schedule.agentId ? 'cursor-pointer' : 'cursor-default'}`}
                     style={{ fontFamily: 'inherit' }}
                   >
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -859,7 +860,13 @@ export function ScheduleConsole() {
                                 {schedule.status === 'active' ? 'Pause' : 'Resume'}
                               </ActionButton>
                             )}
-                            {/* Hub: Edit and Archive hidden; Windows tasks are changed in Task Scheduler */}
+                            {/* Hub: Edit and Archive only for agent schedules; Windows tasks are changed in Task Scheduler */}
+                            {schedule.agentId && (<>
+                            <ActionButton disabled={isBusy} onClick={() => openSchedule(schedule.id)}>Edit</ActionButton>
+                            <ActionButton tone="danger" disabled={isBusy} onClick={() => handleArchive(schedule.id)}>
+                              {isBusy ? 'Deleting...' : 'Delete'}
+                            </ActionButton>
+                            </>)}
                           </>
                         )}
                       </div>
