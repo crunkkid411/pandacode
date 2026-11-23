@@ -4125,6 +4125,14 @@ pub fn run() {
                     bots::bot_assign_task,
                     bots::bot_task_links,
                     bots::bot_task_brief,
+                    // Chatrooms = bot group chats (src/sc-hub/chatrooms.ts).
+                    bots::shared_channels::bot_shared_channels,
+                    bots::shared_channels::bot_shared_channel_detail,
+                    bots::shared_channels::bot_shared_channel_create,
+                    bots::shared_channels::bot_shared_channel_update,
+                    bots::shared_channels::bot_shared_channel_archive,
+                    bots::shared_channels::bot_shared_channel_post,
+                    bots::shared_channels::bot_shared_channel_stop,
                     overlay::overlay_open_task,
                     // SwarmClaw's Schedules page: each agent's own schedules.
                     bots::schedule::bot_schedule_create,

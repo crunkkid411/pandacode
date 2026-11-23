@@ -31,6 +31,13 @@ let nextId = 100;
 // Agents are bots (bots.rs): b1 coordinates b2 on the Org Chart; b3 is not placed on it yet.
 type MockBot = HubBot & Record<string, any>;
 const profile = { instructions: '', goals: '', soul: '', avatar: '', mode: 'ask', color: '', reasoningEffort: '', backupModels: [], fallbackMode: 'ask', notify: true, whileWorking: 'queue', showPlan: false, skills: [], mcp: [], createdAt: now - 9e6, updatedAt: now - 9e6, desktopSession: null };
+interface MockRoom { id: string; name: string; memberIds: string[]; leadBotId: null; archived: boolean; updatedAt: number; activeBotIds: string[];
+  messages: { id: string; kind: string; authorBotId: string | null; text: string; status: string | null; createdAt: number }[] }
+const rooms: MockRoom[] = [
+  { id: 'r1', name: 'morning-team', memberIds: ['b1', 'b2'], leadBotId: null, archived: false, updatedAt: now - 3_600_000, activeBotIds: [],
+    messages: [{ id: 'm1', kind: 'user', authorBotId: null, text: 'What is on today?', status: 'Done', createdAt: now - 3_600_000 }, { id: 'm2', kind: 'reply', authorBotId: 'b1', text: 'Two jobs and one render.', status: null, createdAt: now - 3_500_000 }] },
+  { id: 'r2', name: 'old-room', memberIds: ['b1'], leadBotId: null, archived: true, updatedAt: now - 9e7, activeBotIds: [], messages: [] },
+];
 const bots: MockBot[] = [
   { ...profile, id: 'b1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null, org: { parentId: null, swarmRole: 'coordinator', onChart: true } },
   { ...profile, id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null, org: { parentId: 'b1', swarmRole: 'worker', onChart: true } },
@@ -231,6 +238,21 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { scope: 'X:\\AI-2', path: 'C:/m/no-telegram.md', name: 'no-telegram-no-multiple-choice', description: 'He does not use Telegram; ask in plain words', kind: 'feedback', modified: now - 3_600_000 },
     { scope: 'X:\\AI-2', path: 'C:/m/iphone.md', name: 'jordan-devices', description: 'iPhone 13 Pro', kind: 'user', modified: now - 7_200_000 },
   ] as T;
+  if (command.startsWith('bot_shared_channel')) {
+    const ch = (id: string) => { const c = rooms.find(r => r.id === id); if (!c) throw new Error('No channel'); return c; };
+    if (command === 'bot_shared_channels') return rooms.map(r => ({ ...r, messages: undefined, activeBotIds: undefined })) as T;
+    if (command === 'bot_shared_channel_detail') return { ...ch(args.channelId), messages: [...ch(args.channelId).messages], activeBotIds: [...ch(args.channelId).activeBotIds], hasMore: false } as T;
+    if (command === 'bot_shared_channel_create') { const r = { id: `r${rooms.length + 1}`, name: args.name, memberIds: args.memberIds, leadBotId: null, archived: false, updatedAt: Date.now(), messages: [], activeBotIds: [] }; rooms.push(r); return { ...r } as T; }
+    if (command === 'bot_shared_channel_update') { Object.assign(ch(args.channelId), { name: args.name, memberIds: args.memberIds }); return { ...ch(args.channelId) } as T; }
+    if (command === 'bot_shared_channel_archive') { ch(args.channelId).archived = args.archived; return undefined as T; }
+    if (command === 'bot_shared_channel_post') {
+      const r = ch(args.channelId);
+      r.messages.push({ id: `m${Date.now()}`, kind: 'user', authorBotId: null, text: args.text, status: 'In progress', createdAt: Date.now() });
+      r.activeBotIds = [...r.memberIds];
+      setTimeout(() => { for (const b of r.memberIds) r.messages.push({ id: `m${b}${Date.now()}`, kind: 'reply', authorBotId: b, text: `${b} heard: ${args.text}`, status: null, createdAt: Date.now() }); r.activeBotIds = []; }, 600);
+      return undefined as T;
+    }
+  }
   if (command === 'hub_knowledge_collections') return [{ name: 'youtube-notes', files: 1048, updated: '15h ago' }, { name: 'github-stars', files: 1022, updated: '1d ago' }] as T;
   if (command === 'hub_knowledge_search') return [
     { docid: '#1', score: 0.9, file: 'qmd://youtube-notes/cooling.md', title: 'Laptop cooling video', snippet: '@@ -1,3 @@\n---\ntitle: x\nFans and heat' },

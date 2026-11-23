@@ -8,6 +8,7 @@ import { JOB_PREFIX, jobBoardTasks, startJob } from './jobs-md';
 import { parseInbox } from './install-list';
 import { inboxItems, type InboxItem, type InboxSession, type Seen } from './inbox-facts';
 import { projectRows, sessionRows, type PcProject } from './sessions-facts';
+import { listRooms, oneRoom, roomStream, toRoom, type SharedChannel } from './chatrooms';
 import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
 import { chatCommands, forwardMentions, slashParts } from './chat-commands';
@@ -62,6 +63,7 @@ function chatSession(c: Chat, agentId: string | null = null) {
 }
 
 /** The bot whose own thread this conversation is, if any. */
+const botNames = async (call: Call) => Object.fromEntries((await listBots(call)).map(b => [b.id, b.name]));
 const botOfThread = async (call: Call, sessionId: string) => (await listBots(call)).find(b => b.desktopSession === sessionId)?.id ?? null;
 
 /** PandaCode's message rows in SwarmClaw's shape. Errors show as the agent's reply with a warning sign. */
@@ -465,6 +467,35 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/hub-memory$/, run: ({ call }) => call('hub_memory_list') },
   { method: 'POST', path: /^\/hub-memory\/read$/, run: ({ call, body }) => call('hub_memory_read', { path: ((body ?? {}) as { path?: string }).path ?? '' }) },
   { method: 'POST', path: /^\/hub-memory\/open$/, run: async ({ call, body }) => { await call('hub_open_path', { path: ((body ?? {}) as { path?: string }).path ?? '', folder: false }); return { ok: true }; } },
+  // Chatrooms = bot group chats (chatrooms.ts).
+  { method: 'GET', path: /^\/chatrooms$/, run: async ({ call }) => listRooms(call, await botNames(call)) },
+  { method: 'GET', path: /^\/chatrooms\/([^/]+)$/, run: async ({ call, match }) => oneRoom(call, match[1], await botNames(call)) },
+  { method: 'POST', path: /^\/chatrooms$/, run: async ({ call, body }) => {
+    const b = (body ?? {}) as { name?: string; agentIds?: string[] };
+    return toRoom(await call<SharedChannel>('bot_shared_channel_create', { name: b.name ?? '', memberIds: b.agentIds ?? [] }));
+  } },
+  { method: 'PUT', path: /^\/chatrooms\/([^/]+)$/, run: async ({ call, match, body }) => {
+    const id = match[1], names = await botNames(call);
+    const now = await oneRoom(call, id, names);
+    const b = (body ?? {}) as { name?: string; agentIds?: string[] };
+    await call('bot_shared_channel_update', { channelId: id, name: b.name ?? now.name, memberIds: b.agentIds ?? now.agentIds, leadBotId: null });
+    return oneRoom(call, id, names);
+  } },
+  { method: 'POST', path: /^\/chatrooms\/([^/]+)\/members$/, run: async ({ call, match, body }) => {
+    const id = match[1], names = await botNames(call), now = await oneRoom(call, id, names);
+    const agentId = ((body ?? {}) as { agentId?: string }).agentId ?? '';
+    await call('bot_shared_channel_update', { channelId: id, name: now.name, memberIds: [...new Set([...now.agentIds, agentId])], leadBotId: null });
+    return oneRoom(call, id, names);
+  } },
+  { method: 'DELETE', path: /^\/chatrooms\/([^/]+)\/members$/, run: async ({ call, match, body }) => {
+    const id = match[1], names = await botNames(call), now = await oneRoom(call, id, names);
+    const agentId = ((body ?? {}) as { agentId?: string }).agentId ?? '';
+    await call('bot_shared_channel_update', { channelId: id, name: now.name, memberIds: now.agentIds.filter(a => a !== agentId), leadBotId: null });
+    return oneRoom(call, id, names);
+  } },
+  { method: 'DELETE', path: /^\/chatrooms\/([^/]+)$/, run: async ({ call, match }) => { await call('bot_shared_channel_archive', { channelId: match[1], archived: true }); return { ok: true }; } },
+  { method: 'POST', path: /^\/chatrooms\/([^/]+)\/chat$/, run: async ({ call, match, body }) =>
+    roomStream(call, match[1], ((body ?? {}) as { text?: string }).text ?? '', await botNames(call)) },
   // Knowledge: his qmd library (hub_knowledge.rs).
   { method: 'GET', path: /^\/hub-knowledge$/, run: ({ call }) => call('hub_knowledge_collections') },
   { method: 'POST', path: /^\/hub-knowledge\/search$/, run: ({ call, body }) => {

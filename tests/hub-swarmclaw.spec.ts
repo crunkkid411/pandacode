@@ -521,3 +521,18 @@ test('knowledge: search his library, narrow to one collection, read a result', a
   await expect(page.getByRole('region', { name: 'Document' })).toContainText('Full text of qmd://github-stars/fan.md');
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-knowledge.png`, fullPage: true });
 });
+
+test('chatrooms: his bot group chats; open one, talk to the room, every agent in it answers', async ({ page }) => {
+  await open(page, '/chatrooms');
+  await expect(page.getByText('morning-team').first()).toBeVisible();
+  await expect(page.getByText('old-room')).toHaveCount(0); // archived rooms stay hidden
+  await page.getByText('morning-team').first().click();
+  await expect(page.getByText('Two jobs and one render.').last()).toBeVisible();
+  const box = page.locator('textarea').last();
+  await box.fill('Status check');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'bot_shared_channel_post')).map(c => c.args.text)).toEqual(['Status check']);
+  await expect(page.getByText('b1 heard: Status check').last()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('b2 heard: Status check').last()).toBeVisible();
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-chatrooms.png`, fullPage: true });
+});
