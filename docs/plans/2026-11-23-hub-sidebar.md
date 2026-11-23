@@ -33,4 +33,5 @@ C. Pages (each with real data)
 - [x] MCP servers and plugins (per harness), Connectors (agent chat links: web chat, Telegram, Discord, Slack, WhatsApp)
 - [x] Chatrooms (= PandaCode bot group chats), Knowledge (qmd library search)
 - [x] Ctrl/Shift multi-select on Sessions, Inbox, Task board, Agents list
-- [ ] Not built, nothing in PandaCode behind them: Webhooks (only used inside WhatsApp links), Missions (budgeted goals with milestones), Quality (eval suites), Feed (SwarmClaw's social feed). Build only if Jordan asks.
+- [x] Placeholder pages (Jordan, 2026-11-23: "they can be blank for now with just an explanation of what SwarmClaw uses each page for"): Webhooks, Missions, Quality, Feed show what SwarmClaw uses them for and "Not built yet" (src/sc-hub/placeholder-page.tsx).
+- [ ] Build those four for real: nothing in PandaCode is behind them yet. Only when Jordan asks.

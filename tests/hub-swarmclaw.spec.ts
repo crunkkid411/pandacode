@@ -601,3 +601,13 @@ test('agents list: Ctrl+click and Shift+click pick agents with no Select step; P
   await page.getByRole('button', { name: 'Switch on', exact: true }).click();
   await expect.poll(async () => (await calls(page, 'bot_set_paused')).filter(c => !c.args.paused).length).toBe(3);
 });
+
+test('placeholder pages: Webhooks, Missions, Quality and Feed are in the sidebar and say what SwarmClaw uses them for', async ({ page }) => {
+  for (const [path, title, word] of [['/webhooks', 'Webhooks', 'wakes an agent up'], ['/missions', 'Missions', 'budget'], ['/quality', 'Quality', 'score'], ['/swarmfeed', 'Feed', 'social timeline']]) {
+    await open(page, path);
+    await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
+    await expect(page.getByText('Not built yet')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'What this page is for' })).toContainText(word);
+  }
+  for (const label of ['Webhooks', 'Missions', 'Quality', 'Feed']) await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible();
+});

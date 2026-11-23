@@ -1,7 +1,8 @@
 'use client'
 
-import { FeedPage } from '@/features/swarmfeed/feed-page'
+// Hub: placeholder until built (src/sc-hub/placeholder-page.tsx).
+import { HubPlaceholder } from '../../../sc-hub/placeholder-page'
 
-export default function SwarmFeedPage() {
-  return <FeedPage />
+export default function Page() {
+  return <HubPlaceholder view="swarmfeed" />
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { QualityWorkspace } from '@/components/quality/quality-workspace'
+// Hub: placeholder until built (src/sc-hub/placeholder-page.tsx).
+import { HubPlaceholder } from '../../../sc-hub/placeholder-page'
 
-export default function QualityPage() {
-  return <QualityWorkspace />
+export default function Page() {
+  return <HubPlaceholder view="quality" />
 }
