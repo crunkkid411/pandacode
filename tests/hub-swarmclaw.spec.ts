@@ -574,3 +574,30 @@ test('connectors: each agent card shows its connections by platform color + stat
   await expect(chief.getByRole('button', { name: 'Copy the link' })).toBeVisible();
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-connectors.png`, fullPage: true });
 });
+
+test('tasks: Ctrl+click picks cards one at a time and Shift+click picks a range, with no checkbox step first', async ({ page }) => {
+  await open(page, '/tasks');
+  const cards = page.locator('[draggable][class*="border-l-[3px]"]'); // task cards, not the sidebar's agent shortcut
+  await expect(cards.nth(3)).toBeVisible();
+  await cards.nth(0).click({ modifiers: ['Control'] });
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await cards.nth(0).click({ modifiers: ['Control'] });
+  await expect(page.getByText('1 selected', { exact: true })).toHaveCount(0);
+  await cards.nth(0).click({ modifiers: ['Control'] });
+  await cards.nth(3).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('4 selected', { exact: true })).toBeVisible();
+});
+
+test('agents list: Ctrl+click and Shift+click pick agents with no Select step; Pause and Switch on act on all picked', async ({ page }) => {
+  await open(page, '/agents');
+  const rows = page.getByTestId('agent-row');
+  await expect(rows.nth(2)).toBeVisible();
+  await rows.nth(0).click({ modifiers: ['Control'] });
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await rows.nth(2).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('3 selected', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'bot_set_paused')).filter(c => c.args.paused).length).toBe(2); // one was already paused
+  await page.getByRole('button', { name: 'Switch on', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'bot_set_paused')).filter(c => !c.args.paused).length).toBe(3);
+});

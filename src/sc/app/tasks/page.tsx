@@ -88,13 +88,22 @@ export default function TasksPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectionMode = selectedIds.size > 0
 
-  const toggleSelect = useCallback((id: string) => {
+  // Cards in the order he sees them (set below, once the filtered lists exist) and the last one picked,
+  // so Shift+click can pick the range between them.
+  const visibleOrder = useRef<string[]>([])
+  const anchorId = useRef<string | null>(null)
+  const toggleSelect = useCallback((id: string, range = false) => {
+    const order = visibleOrder.current
+    const from = anchorId.current ? order.indexOf(anchorId.current) : -1
+    const to = order.indexOf(id)
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
+      if (range && from >= 0 && to >= 0) order.slice(Math.min(from, to), Math.max(from, to) + 1).forEach((t) => next.add(t))
+      else if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
+    anchorId.current = id
   }, [])
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
@@ -242,6 +251,10 @@ export default function TasksPage() {
       .filter((t) => t.status === status)
       .sort((a, b) => b.updatedAt - a.updatedAt),
   [filteredTasks])
+
+  visibleOrder.current = viewMode === 'board'
+    ? ACTIVE_COLUMNS.flatMap((status) => tasksByStatus(status).map((t) => t.id))
+    : filteredTasks.map((t) => t.id)
 
   const selectAllInColumn = useCallback((status: BoardTaskStatus) => {
     const ids = filteredTasks

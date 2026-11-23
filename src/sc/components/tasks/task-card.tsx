@@ -19,7 +19,8 @@ interface TaskCardProps {
   tasksById: Record<string, BoardTask>
   selectionMode?: boolean
   selected?: boolean
-  onToggleSelect?: (id: string) => void
+  /** range = Shift+click: pick everything from the last picked card to this one. */
+  onToggleSelect?: (id: string, range?: boolean) => void
   index?: number
 }
 
@@ -133,9 +134,10 @@ export function TaskCard({
       onDragStart={selectionMode || !allowDrag ? undefined : handleDragStart}
       onDragEnd={selectionMode || !allowDrag ? undefined : handleDragEnd}
       onClick={(e) => {
-        if (selectionMode && onToggleSelect) {
+        // Hub (JOBS.md): Ctrl+click adds/removes one card, Shift+click picks a range, even before any is picked.
+        if ((selectionMode || e.ctrlKey || e.metaKey || e.shiftKey) && onToggleSelect) {
           e.stopPropagation()
-          onToggleSelect(task.id)
+          onToggleSelect(task.id, e.shiftKey)
         } else {
           setEditingTaskId(task.id)
           setTaskSheetOpen(true)

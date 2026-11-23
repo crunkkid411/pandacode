@@ -54,14 +54,39 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const loadSessions = useAppStore((s) => s.loadSessions)
 
-  const toggleSelected = useCallback((id: string) => {
+  // Hub (JOBS.md): rows in the order shown and the last one picked, so Shift+click picks a range.
+  const rowOrder = useRef<string[]>([])
+  const anchorId = useRef<string | null>(null)
+  const toggleSelected = useCallback((id: string, range = false) => {
+    const order = rowOrder.current
+    const from = anchorId.current ? order.indexOf(anchorId.current) : -1
+    const to = order.indexOf(id)
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
+      if (range && from >= 0 && to >= 0) order.slice(Math.min(from, to), Math.max(from, to) + 1).forEach((a) => next.add(a))
+      else if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
+    anchorId.current = id
   }, [])
+  /** Ctrl+click adds/removes one agent, Shift+click picks a range; both start picking with no Select step. */
+  const pickClick = (event: React.MouseEvent, agent: Agent) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) { setBulkMode(true); toggleSelected(agent.id, event.shiftKey) }
+    else if (bulkMode) toggleSelected(agent.id)
+    else void handleSelect(agent)
+  }
+  // Hub: pausing or switching on the picked agents (undoable) replaces SwarmClaw's chat delete, which has no Hub route.
+  const setPicked = async (disabled: boolean) => {
+    const ids = [...selectedIds]
+    try {
+      await Promise.all(ids.map((id) => api('PUT', `/agents/${id}`, { disabled })))
+      await loadAgents()
+      toast.success(`${disabled ? 'Paused' : 'Switched on'} ${ids.length} agent${ids.length === 1 ? '' : 's'}`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   const handleBulkDelete = useCallback(async () => {
     // Collect session IDs for selected agents
@@ -173,6 +198,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
     () => (defaultAgentVisible ? filteredAgents.filter((agent) => agent.id !== defaultAgent?.id) : filteredAgents),
     [defaultAgent?.id, defaultAgentVisible, filteredAgents],
   )
+  rowOrder.current = [...(defaultAgentVisible && defaultAgent ? [defaultAgent.id] : []), ...listAgents.map((agent) => agent.id)]
 
   // FLIP: animate row position changes
   useLayoutEffect(() => {
@@ -270,13 +296,20 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
       {/* Bulk action bar */}
       {bulkMode && selectedIds.size > 0 && (
         <div className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] border-b border-white/[0.04]">
-          <span className="text-[12px] text-text-2 font-500 flex-1">{selectedIds.size} selected</span>
+          <span className="text-[14px] text-text font-600 flex-1">{selectedIds.size} selected</span>
           <button
-            onClick={() => setConfirmBulkDelete(true)}
-            className="px-3 py-1.5 rounded-[8px] border-none bg-red-500/10 text-red-400 text-[12px] font-600 cursor-pointer hover:bg-red-500/20 transition-colors"
-            style={{ fontFamily: 'inherit' }}
+            onClick={() => void setPicked(true)}
+            className="px-3 py-1.5 rounded-[8px] border-none text-white text-[14px] font-600 cursor-pointer hover:brightness-125"
+            style={{ fontFamily: 'inherit', background: '#a16207' }}
           >
-            Delete
+            Pause
+          </button>
+          <button
+            onClick={() => void setPicked(false)}
+            className="px-3 py-1.5 rounded-[8px] border-none text-white text-[14px] font-600 cursor-pointer hover:brightness-125"
+            style={{ fontFamily: 'inherit', background: '#15803d' }}
+          >
+            Switch on
           </button>
         </div>
       )}
@@ -321,7 +354,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
                 data-agent-id={defaultAgent.id}
                 data-agent-name={defaultAgent.name}
                 aria-label={`Open agent chat ${defaultAgent.name}`}
-                onClick={() => bulkMode ? toggleSelected(defaultAgent.id) : handleSelect(defaultAgent)}
+                onClick={(event) => pickClick(event, defaultAgent)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
@@ -426,7 +459,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
               data-agent-id={agent.id}
               data-agent-name={agent.name}
               aria-label={`Open agent chat ${agent.name}`}
-              onClick={() => bulkMode ? toggleSelected(agent.id) : handleSelect(agent)}
+              onClick={(event) => pickClick(event, agent)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()

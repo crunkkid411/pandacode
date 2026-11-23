@@ -26,7 +26,7 @@ interface Props {
   onDrop: (taskId: string, newStatus: BoardTaskStatus) => void
   selectionMode?: boolean
   selectedIds?: Set<string>
-  onToggleSelect?: (id: string) => void
+  onToggleSelect?: (id: string, range?: boolean) => void
   onSelectAll?: () => void
 }
 
