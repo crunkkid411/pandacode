@@ -2685,6 +2685,15 @@ async fn respond_approval(
         .ok_or("This agent is no longer running.")?;
     tx.respond_approval(&state.store, &session_id, request_id, approved)
 }
+/// What a running chat is waiting on (approvals and questions), so the Hub can draw Approve / Deny.
+/// Kept only in memory while the agent runs; a stopped agent has none.
+#[tauri::command]
+async fn pending_requests(state: State<'_, AppState>, session_id: String) -> Result<Vec<providers::AgentEvent>> {
+    let agents = state.agents.lock().map_err(|e| e.to_string())?;
+    let Some(agent) = agents.get(&session_id) else { return Ok(vec![]) };
+    let requests = agent.pending_requests.lock().map_err(|e| e.to_string())?;
+    Ok(requests.values().cloned().collect())
+}
 #[tauri::command]
 async fn list_providers(app: tauri::AppHandle, force: Option<bool>, device_id: Option<String>) -> Result<serde_json::Value> {
     let force = force.unwrap_or(false);
@@ -4093,6 +4102,9 @@ pub fn run() {
                     get_messages,
                     send_message,
                     stop_session,
+                    // An agent asking first: the Hub chat shows its request with Approve / Deny.
+                    pending_requests,
+                    respond_approval,
                     chats::chat_create,
                     // Ask box: Panda Router picks the agent and model for a typed job.
                     list_provider_models,

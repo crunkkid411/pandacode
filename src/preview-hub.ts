@@ -74,6 +74,7 @@ const schedules: HubSchedule[] = [
   { id: 's2', title: 'Check the build', sessionTitle: 'Build', projectName: 'pandacode', prompt: 'Run the tests', kind: 'interval', intervalMinutes: 30, timeOfDay: null, days: [], watchSessionTitle: null, nextRunAt: now + 10 * 60_000, lastRunAt: now - 20 * 60_000, enabled: false, runCount: 3 },
 ];
 
+const asks: Record<string, { sessionId: string; kind: string; text: string; requestId: string; data: null }[]> = {};
 function invokeChats(command: string, args: Record<string, any>): unknown {
   const w = window as any;
   switch (command) {
@@ -114,7 +115,11 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       if (!b.desktopSession) { const c: Chat & { projectId: string } = { id: `t-${b.id}`, projectId: 'pb1', title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id; }
       return b.desktopSession;
     }
-    case 'bot_message': return invokeChats('send_message', { sessionId: invokeChats('bot_desktop_thread', args), text: args.text });
+    case 'bot_message': { const sid = invokeChats('bot_desktop_thread', args) as string;
+      if (args.text === 'ASK') { asks[sid] = [{ sessionId: sid, kind: 'approval', text: 'PowerShell: cubase-read "TEST-FILE.cpr"', requestId: 'r1', data: null }]; (messages[sid] ??= []).push({ id: nextId++, role: 'user', content: 'ASK', createdAt: Date.now() }); return undefined; }
+      return invokeChats('send_message', { sessionId: sid, text: args.text }); }
+    case 'pending_requests': return (asks[args.sessionId] ?? []).map(r => ({ ...r }));
+    case 'respond_approval': { const sid = args.sessionId; asks[sid] = (asks[sid] ?? []).filter(r => r.requestId !== args.requestId); (messages[sid] ??= []).push({ id: nextId++, role: 'assistant', content: args.approved ? 'Ran it: 120 BPM.' : 'OK, I will not run it.', createdAt: Date.now() }); return undefined; }
     case 'schedules_list': return schedules.map(x => ({ ...x }));
     case 'schedule_set_enabled': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.enabled = Boolean(args.enabled); return { ...x }; }
     case 'schedule_run_now': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.runCount++; x.lastRunAt = Date.now(); return { scheduleId: x.id }; }
@@ -144,7 +149,7 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       if (['/review', '/video-rules'].includes(name)) return { action: null, arguments: '' };
       throw new Error(`Unknown command ${name}. Type / to browse this harness's commands, or refresh the list.`);
     }
-    case 'update_session': { const c: any = chats.find(x => x.id === args.sessionId); if (args.title) c.title = args.title; if (args.model) c.model = args.model; return undefined; }
+    case 'update_session': { const c: any = chats.find(x => x.id === args.sessionId); if (args.title) c.title = args.title; if (args.model) c.model = args.model; if (args.mode) c.mode = args.mode; return undefined; }
     case 'stop_session': {
       const c = chats.find(x => x.id === args.sessionId);
       if (c) c.status = 'interrupted';

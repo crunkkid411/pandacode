@@ -36,7 +36,8 @@ async function mcpServers(call: Call) {
 }
 import { work, type Ledger } from '../hub/usage-facts';
 import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
-import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, pcProvider, scProvider, updateBotAgent } from './bot-agents';
+import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, pcProvider, scProvider, updateBotAgent, setBotMode } from './bot-agents';
+import { MODES } from './mode-facts';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 interface Ctx { call: Call; match: RegExpMatchArray; query: URLSearchParams; body: unknown }
@@ -327,7 +328,7 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/hub-capabilities$/, run: async ({ call, query }) => {
     const kind = query.get('kind') ?? '';
     const inv = await call<{ entries: { harness: string; kind: string; name: string; state: string; source: string; command?: string | null }[] }>('capabilities_inventory', { taskId: null });
-    return inv.entries.filter(e => e.kind === kind).map(e => ({ ...e, command: e.command ?? null }));
+    return inv.entries.filter(e => kind === '*' || e.kind === kind).map(e => ({ ...e, command: e.command ?? null })); // '*': every kind in one read (it takes ~10 s)
   } },
   { method: 'GET', path: /^\/providers\/([^/]+)\/discover-models$/, run: ({ call, match, query }) => discoverModels(call, decodeURIComponent(match[1]), query.get('force') === '1') },
   // The form saves the discovered list back; the engine already caches it, so nothing to store.
@@ -343,7 +344,12 @@ export const routes: Route[] = [
     }
     return { updated, errors };
   } },
-  { method: 'GET', path: /^\/chats$/, run: async ({ call }) => Object.fromEntries((await pcChats(call)).map(c => [c.id, chatSession(c)])) },
+  // Each bot's own thread keeps its agentId, or every refresh "un-agents" the open chat and its settings panel closes.
+  { method: 'GET', path: /^\/chats$/, run: async ({ call }) => {
+    const [chats, bots] = await Promise.all([pcChats(call), listBots(call)]);
+    const owner = new Map(bots.filter(b => b.desktopSession).map(b => [b.desktopSession, b.id]));
+    return Object.fromEntries(chats.map(c => [c.id, chatSession(c, owner.get(c.id) ?? null)]));
+  } },
   { method: 'GET', path: /^\/chats\/([^/]+)$/, run: ({ call, match }) => oneChat(call, match[1]) },
   { method: 'GET', path: /^\/chats\/([^/]+)\/messages$/, run: ({ call, match, query }) => chatMessages(call, match[1], query.get('limit')) },
   { method: 'POST', path: /^\/chats\/([^/]+)\/chat$/, run: async ({ call, match, body }) => {
@@ -390,6 +396,30 @@ export const routes: Route[] = [
     if (botId) await updateBotAgent(call, botId, { model }); // an agent's chat runs on the agent's model
     else await call('update_session', { sessionId: match[1], model });
     return { ok: true, model };
+  } },
+  // An agent asking first: what it waits on, and Jordan's answer (approval-card.tsx).
+  { method: 'GET', path: /^\/chats\/([^/]+)\/requests$/, run: ({ call, match }) => call('pending_requests', { sessionId: match[1] }) },
+  { method: 'POST', path: /^\/chats\/([^/]+)\/approve$/, run: async ({ call, match, body }) => {
+    const b = (body ?? {}) as { requestId?: string; approved?: boolean };
+    if (!b.requestId) throw new Error('Nothing is waiting for an answer.');
+    await call('respond_approval', { sessionId: match[1], requestId: b.requestId, approved: b.approved === true });
+    return { ok: true };
+  } },
+  // The chat box's mode chip (Shift+Tab): an agent's chat runs in the agent's own mode, other chats in their own.
+  { method: 'GET', path: /^\/chats\/([^/]+)\/mode$/, run: async ({ call, match }) => {
+    const bot = (await listBots(call)).find(b => b.desktopSession === match[1]);
+    if (bot) return { mode: bot.mode };
+    const c = (await call<Chat[]>('list_sessions')).find(x => x.id === match[1]);
+    if (!c) throw new Error('That chat no longer exists in PandaCode.');
+    return { mode: c.mode ?? 'ask' };
+  } },
+  { method: 'PUT', path: /^\/chats\/([^/]+)\/mode$/, run: async ({ call, match, body }) => {
+    const mode = String((body as { mode?: string } | null)?.mode ?? '');
+    if (!MODES.some(m => m.id === mode)) throw new Error('Unknown mode.');
+    const botId = await botOfThread(call, match[1]);
+    if (botId) await setBotMode(call, botId, mode);
+    else await call('update_session', { sessionId: match[1], mode });
+    return { ok: true, mode };
   } },
   { method: 'POST', path: /^\/upload$/, run: ({ call, body }) => {
     if (!(body instanceof Blob)) throw new Error('Nothing to attach.');

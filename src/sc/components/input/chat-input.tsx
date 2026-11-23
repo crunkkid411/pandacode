@@ -16,6 +16,8 @@ import { call } from '../../../bridge'
 import { pickFiles } from '../../../sc-hub/attachments'
 import { initAudioContext, stopSpeaking } from '@/lib/tts'
 import { ModelMenu } from '../../../sc-hub/model-menu'
+import { ModeChip, cycleMode } from '../../../sc-hub/mode-chip'
+import { ApprovalCards } from '../../../sc-hub/approval-card'
 import { useChatSuggest } from '../../../sc-hub/chat-suggest'
 import { agentNamed, mentioned, slashParts } from '../../../sc-hub/chat-commands'
 import { useNavigate } from '@/lib/app/navigation'
@@ -151,11 +153,17 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (suggest.onKeyDown(e)) return
+    // Shift+Tab steps the agent's mode, as in Claude Code (sc-hub/mode-chip.tsx).
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault()
+      void cycleMode(sessionId)
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       void handleSend()
     }
-  }, [handleSend, suggest])
+  }, [handleSend, sessionId, suggest])
 
   const handleVoice = useCallback((text: string) => {
     if (shouldQueue && sessionId) {
@@ -233,6 +241,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
     <div className="shrink-0 px-4 md:px-12 lg:px-16 pb-4 pt-2 fixed bottom-0 left-0 right-0 z-20 bg-bg/95 backdrop-blur-md md:relative md:z-auto md:bg-transparent md:backdrop-blur-none"
       style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
       <div className="relative" ref={extrasRef}>
+        <ApprovalCards sessionId={sessionId} />
         {busy && visibleQueuedMessages.length === 0 && (
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-amber-500/15 bg-amber-500/[0.06] px-3.5 py-2">
             <div className="min-w-0">
@@ -428,6 +437,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
               </button>
 
               <ModelMenu sessionId={sessionId} />
+              <ModeChip sessionId={sessionId} />
 
               <div className="flex-1" />
 
@@ -463,7 +473,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
               </button>
             </div>
           )}
-          hint="Shift+Enter for newline"
+          hint="Shift+Enter for newline · Shift+Tab changes the mode"
         >
           <textarea
             ref={textareaRef}

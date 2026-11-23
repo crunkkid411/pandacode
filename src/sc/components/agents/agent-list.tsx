@@ -152,7 +152,8 @@ export function AgentList({ inSidebar }: Props) {
     )
   }
 
-  if (!filtered.length && !search) {
+  // Hub: only when there are truly no agents; a saved filter that hides them all must keep its buttons on screen.
+  if (!Object.keys(agents).length && !search) {
     // Show skeleton cards while loading
     if (!loaded) {
       return (
@@ -271,6 +272,7 @@ export function AgentList({ inSidebar }: Props) {
         </div>
       )}
       <div className="flex flex-col gap-1 px-2 pb-4">
+        {!filtered.length ? <p className="px-3 py-2 text-[13px] text-text-2">No agent matches this filter. Click All to see every agent.</p> : null}
         {filtered.map((p) => (
           <div key={p.id} ref={(el) => { if (el) cardRefs.current.set(p.id, el); else cardRefs.current.delete(p.id) }}>
             <AgentCard agent={p} isDefault={p.id === defaultAgentId} isRunning={runningAgentIds.has(p.id)} isOnline={onlineAgentIds.has(p.id)} isSelected={p.id === selectedAgentId} onSetDefault={handleSetDefault} />

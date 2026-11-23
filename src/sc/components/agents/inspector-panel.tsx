@@ -27,6 +27,7 @@ import { ModelCombobox } from '@/components/shared/model-combobox'
 import { buildOpenClawMainSessionKey } from '@/lib/openclaw/openclaw-agent-id'
 import { StructuredSessionLauncher } from '@/components/protocols/structured-session-launcher'
 import { useWs } from '@/hooks/use-ws'
+import { AgentProfile } from '../../../sc-hub/agent-profile'
 import { buildAgentSelectableProviders } from '@/lib/agent-provider-options'
 
 interface Props {
@@ -305,7 +306,7 @@ export function InspectorPanel({ agent, session, onEditAgent, onDuplicateAgent, 
           <DashboardTab agent={agent} session={session} />
         )}
         {inspectorTab === 'config' && (
-          <ConfigTab agent={agent} />
+          <ConfigTab agent={agent} session={session} />
         )}
         {inspectorTab === 'files' && isOpenClaw && (
           <AgentFilesEditor agentId={agent.id} />
@@ -1094,15 +1095,18 @@ function StickyFooter({ agent, isMainChat, onEditAgent, onDuplicateAgent, onClea
 
 // ─── Config Tab ──────────────────────────────────────────────────
 
-function ConfigTab({ agent }: { agent: Agent }) {
+function ConfigTab({ agent, session }: { agent: Agent; session: Session }) {
   const isOpenClaw = agent.provider === 'openclaw'
   const schedules = useAppStore((s) => s.schedules)
   const agentSchedules = Object.values(schedules).filter((s) => s.agentId === agent.id)
+
   const [executeOpen, setExecuteOpen] = useState(false)
   const [browserSandboxOpen, setBrowserSandboxOpen] = useState(false)
   const [openclawOpen, setOpenclawOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-
+  // Hub: what the agent really is and can use (sc-hub/agent-profile.tsx), then its schedules. SwarmClaw's
+  // Execute / Browser Sandbox settings have nothing behind them in PandaCode, so they are not shown.
+  if (!isOpenClaw) return (<><AgentProfile agent={agent} session={session} /><div className="px-4 pb-4"><AutomationsSection schedules={agentSchedules} agent={agent} /></div></>)
   return (
     <div className="p-4 flex flex-col gap-4">
       {/* Skills section */}

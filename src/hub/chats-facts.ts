@@ -3,7 +3,7 @@
 // Tested by tests/hub-facts.test.mjs.
 import type { Tone } from './facts';
 
-export interface Chat { id: string; title: string; provider: string; model: string; status: string; archived: boolean; draft?: boolean; createdAt: number; updatedAt: number; lastResponseAt: number | null; lastPromptAt?: number | null }
+export interface Chat { id: string; title: string; provider: string; model: string; status: string; archived: boolean; draft?: boolean; createdAt: number; updatedAt: number; lastResponseAt: number | null; lastPromptAt?: number | null; mode?: string }
 export interface ChatMessage { id: number; role: string; content: string; createdAt: number }
 export interface MessagePage { messages: ChatMessage[]; hasOlder: boolean }
 export interface Provider { id: string; name: string; installed: boolean }

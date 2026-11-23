@@ -611,3 +611,53 @@ test('placeholder pages: Webhooks, Missions, Quality and Feed are in the sidebar
   }
   for (const label of ['Webhooks', 'Missions', 'Quality', 'Feed']) await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible();
 });
+
+test('agent settings: the panel stays open, its Config tab shows what the agent is and can use, and Shift+Tab changes the mode', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('hello');
+  await box.press('Enter');
+  await expect(page.getByText('Done: hello').first()).toBeVisible();
+  const gear = page.getByRole('button', { name: 'Toggle inspector' });
+  if (!(await page.getByRole('button', { name: 'Close inspector' }).isVisible())) await gear.click();
+  await page.waitForTimeout(3000); // the chat list refreshes in this time; the panel must survive it
+  await expect(page.getByRole('button', { name: 'Close inspector' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Config', exact: true }).click();
+  const runsOn = page.getByRole('region', { name: 'Runs on' });
+  await expect(runsOn).toContainText('Claude Code');
+  await expect(runsOn.getByRole('button', { name: /Mode: Ask first/ })).toBeVisible();
+  const uses = page.getByRole('region', { name: 'What it can use' });
+  await expect(uses.getByRole('button', { name: /Plugins/ })).toContainText('2');
+  await uses.getByRole('button', { name: /Plugins/ }).click();
+  await expect(uses.getByText('ponytail@ponytail')).toBeVisible();
+  await expect(uses.getByRole('button', { name: /Hub tools/ })).toBeVisible();
+  await box.focus();
+  await box.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: /Mode: Accept edits/ }).first()).toBeVisible();
+  await expect.poll(async () => (await calls(page, 'bot_update')).map(c => c.args.input.mode)).toEqual(['auto']);
+  await box.press('Shift+Tab');
+  await expect.poll(async () => (await calls(page, 'bot_update')).map(c => c.args.input.mode)).toEqual(['auto', 'plan']);
+  await expect(box).toBeFocused(); // Shift+Tab did not move focus out of the chat box
+});
+
+test('agents config list: a saved filter that hides every agent says so and keeps its buttons', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('sc_fleet_filter', 'running'));
+  await open(page, '/agents');
+  await page.getByRole('button', { name: 'config', exact: true }).click();
+  await expect(page.getByText('No agents yet')).toHaveCount(0);
+  await expect(page.getByText('No agent matches this filter.')).toBeVisible();
+  await page.getByRole('button', { name: 'all', exact: true }).first().click();
+  await expect(page.getByText('Inbox Sorter').first()).toBeVisible();
+});
+
+test('ask first: a request the agent waits on shows in its chat with Approve, and the answer reaches PandaCode', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('ASK');
+  await box.press('Enter');
+  const card = page.getByRole('region', { name: 'The agent asks first' });
+  await expect(card).toContainText('cubase-read');
+  await card.getByRole('button', { name: 'Approve' }).click();
+  await expect(card).toHaveCount(0);
+  await expect.poll(async () => (await calls(page, 'respond_approval')).map(c => [c.args.requestId, c.args.approved])).toEqual([['r1', true]]);
+});

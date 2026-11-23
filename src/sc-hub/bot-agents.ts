@@ -102,3 +102,8 @@ export const updateBotAgent = async (call: Call, id: string, a: Partial<Agent>) 
 export async function deleteBotAgent(call: Call, id: string) { await call('bot_delete', { botId: id }); return id; }
 /** The bot's own conversation, made on first use. */
 export const botThread = (call: Call, id: string) => call<string>('bot_desktop_thread', { botId: id });
+/** Shift+Tab in the chat box: the agent's mode (how much it may do without asking), kept with its profile. */
+export const setBotMode = async (call: Call, id: string, mode: string) => {
+  const bot = await oneBot(call, id);
+  await call('bot_update', { botId: id, input: { ...input(bot, {}), mode } });
+};

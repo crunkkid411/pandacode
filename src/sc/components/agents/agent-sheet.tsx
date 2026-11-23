@@ -36,6 +36,7 @@ import { getEnabledExtensionIds, getEnabledToolIds } from '@/lib/capability-sele
 import { buildAgentSelectableProviders, resolveAgentSelectableProviderCredentials } from '@/lib/agent-provider-options'
 import { AgentSocialSettings } from '@/features/swarmfeed/agent-social-settings'
 import { AgentMarketplaceSettings } from '@/features/swarmdock/agent-marketplace-settings'
+import { CanUse, RunsOn } from '../../../sc-hub/agent-profile'
 import type { ConfigVersion } from '@/types/config-version'
 import { ProviderDiagnosticsList } from '@/components/providers/provider-diagnostics-list'
 
@@ -69,7 +70,9 @@ interface ExtensionToolInfo {
   description: string
 }
 
-const HUB_HIDDEN_SECTIONS = new Set(['Context & Tool Access', 'Voice & Autonomy', 'Memory & Intelligence', 'Continuity', 'Safety & Limits', 'Configuration History', 'Utilities'])
+const HUB_HIDDEN_SECTIONS = new Set(['Context & Tool Access', 'Voice & Autonomy', 'Memory & Intelligence', 'Continuity', 'Safety & Limits', 'Configuration History', 'Utilities',
+  // SwarmFeed and SwarmDock (a marketplace paid in USDC) have nothing behind them in the Hub.
+  'Social Network', 'Marketplace'])
 
 function SectionCard({
   title,
@@ -1789,6 +1792,14 @@ export function AgentSheet() {
       )}
 
       </SectionCard>
+
+      {/* Hub: what this agent runs on and can use, in plain view (sc-hub/agent-profile.tsx). */}
+      {editing && (
+        <div className="mb-8 flex flex-col gap-4">
+          <RunsOn agent={editing} sessionId={editing.threadSessionId ?? null} />
+          <CanUse agent={editing} note="To add a skill or tool server just for this agent: Advanced Settings, then Tools & Skills." />
+        </div>
+      )}
 
       <SectionCard
         title="Instructions"
