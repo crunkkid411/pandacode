@@ -15,6 +15,8 @@ import { AVAILABLE_TOOLS, PLATFORM_TOOLS } from '@/lib/tool-definitions'
 import { MCP_INJECTION_PROVIDER_IDS, NATIVE_CAPABILITY_PROVIDER_IDS, NON_LANGGRAPH_PROVIDER_IDS, WORKER_ONLY_PROVIDER_IDS } from '@/lib/provider-sets'
 import { isOrchestratorProviderEligible } from '@/lib/orchestrator-config'
 import { AgentAvatar } from './agent-avatar'
+import { ProviderPickCard, formMascot } from '../../../sc-hub/provider-pick-card'
+import { toolFor } from '../../../sc-hub/mascots'
 import { AgentPickerList } from '@/components/shared/agent-picker-list'
 import { randomSoul } from '@/lib/soul-suggestions'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -85,7 +87,7 @@ function SectionCard({
   // Hub: Advanced Settings sections a bot does not save stay hidden.
   if (HUB_HIDDEN_SECTIONS.has(title)) return null
   return (
-    <section className={`mb-8 rounded-[20px] border border-white/[0.06] bg-surface/70 p-5 sm:p-6 ${className}`}>
+    <section className={`mb-8 rounded-[20px] border border-white/[0.08] bg-surface-2 p-5 sm:p-6 ${className}`}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h3 className="font-display text-[17px] font-700 tracking-[-0.02em] text-text">{title}</h3>
@@ -1255,7 +1257,7 @@ export function AgentSheet() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-4">
             <div className="relative group shrink-0">
-              <AgentAvatar seed={avatarUrl ? null : (avatarSeed || null)} avatarUrl={avatarUrl} name={name || 'A'} size={64} />
+              <AgentAvatar seed={avatarUrl ? null : formMascot(provider, model, name || 'new agent', toolFor(`${name} ${description}`))} avatarUrl={avatarUrl} name={name || 'A'} size={72} />
               <label className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -1386,7 +1388,7 @@ export function AgentSheet() {
         <div className="mb-8 space-y-5">
           {openclawGatewayProfiles.length > 0 && (
             <div>
-              <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Gateway Profile</label>
+              <label className="block font-display text-[14px] font-700 text-text mb-2">Gateway Profile</label>
               <select
                 value={gatewayProfileId || ''}
                 onChange={(e) => applyGatewayProfileSelection(e.target.value || null)}
@@ -1404,7 +1406,7 @@ export function AgentSheet() {
           {/* Connection fields */}
           <div className="space-y-4">
             <div>
-              <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Gateway URL</label>
+              <label className="block font-display text-[14px] font-700 text-text mb-2">Gateway URL</label>
               <input
                 type="text"
                 value={apiEndpoint || ''}
@@ -1415,7 +1417,7 @@ export function AgentSheet() {
               />
             </div>
             <div>
-              <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Gateway Token</label>
+              <label className="block font-display text-[14px] font-700 text-text mb-2">Gateway Token</label>
               {openclawCredentials.length > 0 && !addingKey ? (
                 <div className="flex gap-2">
                   <select value={credentialId || ''} onChange={(e) => {
@@ -1596,26 +1598,13 @@ export function AgentSheet() {
 
       {!openclawEnabled && <div className="mb-8">
         <SectionLabel>Provider</SectionLabel>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
           {agentSelectableProviders.map((p) => {
             const nextCredentials = resolveAgentSelectableProviderCredentials(p.id, credentials, providerConfigs)
             const isConnected = !p.requiresApiKey || nextCredentials.length > 0
             return (
-              <button
-                key={p.id}
-                onClick={() => applyDirectProviderSelection(p.id)}
-                className={`relative py-3.5 px-4 rounded-[14px] text-center cursor-pointer transition-all duration-200
-                  active:scale-[0.97] text-[14px] font-600 border
-                  ${provider === p.id
-                    ? 'bg-accent-soft border-accent-bright/25 text-accent-bright'
-                    : 'bg-surface border-white/[0.06] text-text-2 hover:bg-surface-2'}`}
-                style={{ fontFamily: 'inherit' }}
-              >
-                {isConnected && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400" />
-                )}
-                {p.name}
-              </button>
+              <ProviderPickCard key={p.id} provider={p.id} model={provider === p.id ? model : ''} selected={provider === p.id}
+                connected={isConnected} onPick={() => applyDirectProviderSelection(p.id)} />
             )
           })}
         </div>
@@ -1758,7 +1747,7 @@ export function AgentSheet() {
       {/* Fallback Credentials */}
       {!openclawEnabled && (currentProvider?.requiresApiKey || currentProvider?.optionalApiKey || (provider === 'ollama' && ollamaMode === 'cloud')) && providerCredentials.length > 1 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="block font-display text-[14px] font-700 text-text mb-2">
             Fallback Keys <span className="normal-case tracking-normal font-normal text-text-3">(for auto-failover)</span>
           </label>
           <p className="text-[12px] text-text-3/60 mb-3">If the primary key fails (rate limit, auth error), these keys will be tried in order.</p>
@@ -1806,7 +1795,7 @@ export function AgentSheet() {
         description="Keep the agent's personality and core prompt visible and easy to edit."
       >
         <div className="mb-8">
-          <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text mb-2">
             Soul / Personality <span className="normal-case tracking-normal font-normal text-text-3">(optional)</span>
             <HintTip text="The agent's voice and tone — how it talks, not what it knows" />
             {soul !== soulInitial && soulSaveState === 'idle' && (
@@ -1862,7 +1851,7 @@ export function AgentSheet() {
         {provider !== 'openclaw' ? (
           <div className="mb-1">
             <div className="mb-3 flex items-center gap-2">
-              <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em]">System Prompt <HintTip text="Instructions that tell the agent what it can do, what tools to use, and how to behave" /></label>
+              <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text">System Prompt <HintTip text="Instructions that tell the agent what it can do, what tools to use, and how to behave" /></label>
               <button onClick={() => promptFileRef.current?.click()} className="shrink-0 px-2 py-1 rounded-[8px] border border-white/[0.08] bg-surface text-[11px] text-text-3 hover:text-text-2 cursor-pointer transition-colors" style={{ fontFamily: 'inherit' }}>Upload .md</button>
               <input ref={promptFileRef} type="file" accept=".md,.txt,.markdown" onChange={handleFileUpload(setSystemPrompt)} className="hidden" />
             </div>
@@ -1983,7 +1972,7 @@ export function AgentSheet() {
             {orchestratorEnabled && (
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+                  <label className="block font-display text-[14px] font-700 text-text mb-2">
                     Mission
                   </label>
                   <textarea
@@ -1998,7 +1987,7 @@ export function AgentSheet() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+                    <label className="block font-display text-[14px] font-700 text-text mb-2">
                       Wake Interval
                     </label>
                     <input
@@ -2011,7 +2000,7 @@ export function AgentSheet() {
                     />
                   </div>
                   <div>
-                    <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+                    <label className="block font-display text-[14px] font-700 text-text mb-2">
                       Governance
                     </label>
                     <select
@@ -2026,7 +2015,7 @@ export function AgentSheet() {
                     </select>
                   </div>
                   <div>
-                    <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+                    <label className="block font-display text-[14px] font-700 text-text mb-2">
                       Max Cycles/Day
                     </label>
                     <input
@@ -2175,7 +2164,7 @@ export function AgentSheet() {
         className="mb-6 border-white/[0.05] bg-white/[0.01]"
       >
       <div className="mb-8">
-        <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+        <label className="block font-display text-[14px] font-700 text-text mb-2">
           Voice &amp; Audio
         </label>
         {voiceControlsAvailable ? (
@@ -2211,7 +2200,7 @@ export function AgentSheet() {
       </div>
 
       <div>
-        <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+        <label className="block font-display text-[14px] font-700 text-text mb-2">
           Heartbeat Controls
         </label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -2310,7 +2299,7 @@ export function AgentSheet() {
         className="mb-6 border-white/[0.05] bg-white/[0.01]"
       >
       <div className="mb-8">
-        <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+        <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text mb-2">
           Identity Continuity <HintTip text="Seeds the agent's continuity state so session memory can preserve a stable persona and relationship context." />
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
@@ -2331,7 +2320,7 @@ export function AgentSheet() {
       </div>
 
       <div>
-        <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+        <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text mb-2">
           Session Reset Policy <HintTip text="Controls when this agent's sessions are considered stale and should be refreshed." />
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
@@ -2358,7 +2347,7 @@ export function AgentSheet() {
       >
       {Object.keys(projects).length > 0 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Project</label>
+          <label className="block font-display text-[14px] font-700 text-text mb-2">Project</label>
           <select value={projectId || ''} onChange={(e) => setProjectId(e.target.value || undefined)} className={inputClass} style={{ fontFamily: 'inherit' }}>
             <option value="">No project</option>
             {Object.values(projects).map((project) => (
@@ -2369,7 +2358,7 @@ export function AgentSheet() {
       )}
       {openclawEnabled && (
         <div className="mb-8">
-          <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text mb-2">
             Gateway Preferences <HintTip text="When multiple OpenClaw gateways are available, prefer matching tags or deployment templates before falling back to the default route." />
           </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2395,7 +2384,7 @@ export function AgentSheet() {
         </div>
       )}
       <div className="mb-8" style={{ display: 'none' }} /* Hub: bots use backup models, set elsewhere */>
-        <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+        <label className="flex items-center gap-2 font-display text-[14px] font-700 text-text mb-2">
           Model Routing <HintTip text="Route this agent through a provider/model pool instead of a single fixed model. The base provider remains the default when no route matches." />
         </label>
         <div className="flex items-center gap-3 mb-3">
@@ -2534,7 +2523,7 @@ export function AgentSheet() {
         )}
       </div>
       <div style={{ display: 'none' }} /* Hub: a bot's reach is set by its approval mode */>
-        <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Filesystem Access</label>
+        <label className="block font-display text-[14px] font-700 text-text mb-2">Filesystem Access</label>
         <select
           value={filesystemScope}
           onChange={(e) => setFilesystemScope(e.target.value as 'workspace' | 'machine')}
@@ -2599,7 +2588,7 @@ export function AgentSheet() {
       {/* Tools — hidden for providers that manage capabilities outside LangGraph */}
       {!hasNativeCapabilities && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Tools</label>
+          <label className="block font-display text-[14px] font-700 text-text mb-2">Tools</label>
           <p className="text-[12px] text-text-3/60 mb-3">Enable built-in tool families for this agent.</p>
           <div className="space-y-3">
             {AVAILABLE_TOOLS
@@ -2628,7 +2617,7 @@ export function AgentSheet() {
 
       {/* Filesystem Access. Hub: hidden; a bot's reach is set by its approval mode */}
       <div className="mb-8" style={{ display: 'none' }}>
-        <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Filesystem Access</label>
+        <label className="block font-display text-[14px] font-700 text-text mb-2">Filesystem Access</label>
         <select
           value={filesystemScope}
           onChange={(e) => setFilesystemScope(e.target.value as 'workspace' | 'machine')}
@@ -2645,7 +2634,7 @@ export function AgentSheet() {
       {/* Platform — hidden for providers that manage capabilities outside LangGraph */}
       {!hasNativeCapabilities && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Platform Tools</label>
+          <label className="block font-display text-[14px] font-700 text-text mb-2">Platform Tools</label>
           <p className="text-[12px] text-text-3/60 mb-3">Allow this agent to manage platform resources directly.</p>
           <div className="space-y-3">
             {PLATFORM_TOOLS
@@ -2674,7 +2663,7 @@ export function AgentSheet() {
 
       {!hasNativeCapabilities && externalTools.length > 0 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Extension Tools</label>
+          <label className="block font-display text-[14px] font-700 text-text mb-2">Extension Tools</label>
           <p className="text-[12px] text-text-3/60 mb-3">Attach enabled external extension tools to this agent.</p>
           <div className="space-y-3">
             {externalTools.map((t) => {
@@ -2732,7 +2721,7 @@ export function AgentSheet() {
       {false && provider === 'claude-cli' && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em]">
+            <label className="block font-display text-[14px] font-700 text-text">
               Pinned Claude Skills <span className="normal-case tracking-normal font-normal text-text-3">(from ~/.claude/skills/)</span>
             </label>
             <button
@@ -2779,7 +2768,7 @@ export function AgentSheet() {
       {/* Dynamic Skills from Skills Manager */}
       {Object.keys(dynamicSkills).length > 0 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="block font-display text-[14px] font-700 text-text mb-2">
             Skills &amp; slash commands
           </label>
           {/* Hub: his catalog has every skill, slash command and agent file on the PC, so search it; picks show first. */}
@@ -2824,7 +2813,7 @@ export function AgentSheet() {
       {/* MCP Servers */}
       {Object.keys(mcpServers).length > 0 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="block font-display text-[14px] font-700 text-text mb-2">
             MCP Servers
           </label>
           <p className="text-[12px] text-text-3/60 mb-3">Connect external tool servers to this agent via MCP.</p>
@@ -2853,7 +2842,7 @@ export function AgentSheet() {
       {/* MCP Tools — per-tool enable/disable toggles */}
       {/* Hub: per-tool toggles are not saved */ false && mcpServerIds.length > 0 && Object.keys(mcpTools).length > 0 && (
         <div className="mb-8">
-          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
+          <label className="block font-display text-[14px] font-700 text-text mb-2">
             MCP Tools
           </label>
           <p className="text-[12px] text-text-3/60 mb-3">
@@ -2898,7 +2887,7 @@ export function AgentSheet() {
       )}
 
       <div className="mb-2" style={{ display: 'none' }} /* Hub: capability tags are not saved on a bot */>
-        <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Capabilities</label>
+        <label className="block font-display text-[14px] font-700 text-text mb-2">Capabilities</label>
         <p className="text-[12px] text-text-3/60 mb-3">Optional tags that describe what this agent is especially good at.</p>
         {capabilities.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">

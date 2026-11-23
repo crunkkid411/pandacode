@@ -433,3 +433,16 @@ test('task board: PandaCode tasks by stage; a new task handed to an agent starts
   await expect.poll(() => statusOf('Caption the vlog')).toBe('completed'); // the Review column
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-task-board.png`, fullPage: true });
 });
+
+test('look: rail, side panel and page are different grays (no purple tint); text is white; provider choice shows mascots', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await expect(page.getByText('Clip Finder').first()).toBeVisible();
+  const bg = (sel: string) => page.locator(sel).first().evaluate(e => getComputedStyle(e).backgroundColor);
+  const shades = [await bg('[data-hub-rail]'), await bg('.bg-raised:not([data-hub-rail])'), await bg('.bg-bg')];
+  expect(new Set(shades).size).toBe(3);
+  for (const c of shades) { const [r, g, b] = c.match(/\d+/g)!.map(Number); expect(r === g && g === b).toBe(true); }
+  expect(await page.locator('.text-text').first().evaluate(e => getComputedStyle(e).color)).toBe('rgb(255, 255, 255)');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const claude = page.getByRole('button', { name: 'Claude Code', exact: true });
+  await expect.poll(() => claude.evaluate(e => e.innerHTML)).toContain('crispEdges'); // Clawd
+});

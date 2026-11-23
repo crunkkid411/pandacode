@@ -95,6 +95,7 @@ export function SidebarRail({
 
   return (
     <div
+      data-hub-rail
       className={`shrink-0 bg-raised border-r border-white/[0.04] flex flex-col py-4 min-h-0 transition-all duration-300 overflow-visible ${mobile ? 'w-full' : ''}`}
       style={mobile ? undefined : { width: railExpanded ? 180 : 60, transitionTimingFunction: 'var(--ease-spring)' }}
     >

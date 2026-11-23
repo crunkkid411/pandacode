@@ -10,6 +10,7 @@ import { Toaster } from '../sc/components/ui/sonner';
 import { DashboardShell } from '../sc/components/layout/dashboard-shell';
 import { AppQueryProvider } from '../sc/components/providers/app-query-provider';
 import '../sc/app/globals.css';
+import './hub-look.css';
 
 installAdapter();
 

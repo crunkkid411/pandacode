@@ -1,0 +1,125 @@
+/* Hub look (Jordan, 2026-11-23): sections told apart by shades of gray and black like murmur and Poka,
+   not one purple-tinted black; cards filled lighter than the page behind them; text really white;
+   what is hovered, focused or chosen glows. Loaded after SwarmClaw's globals.css (src/sc-hub/main.tsx).
+   Dark mode only: SwarmClaw's .light rules stay as they are. */
+
+:root {
+  --neutral-tint: #1e1e1e;
+  --background: #0b0b0b;
+  --card: #1c1c1c;
+  --popover: #1c1c1c;
+  --secondary: #242424;
+  --muted: #242424;
+  --muted-foreground: #d4d4d4;
+  --sidebar: #141414;
+  --border: rgba(255,255,255,0.12);
+  --input: rgba(255,255,255,0.07);
+  --foreground: #ffffff;
+  --card-foreground: #ffffff;
+  --popover-foreground: #ffffff;
+  --secondary-foreground: #ffffff;
+  --sidebar-foreground: #ffffff;
+  --command-bg: #141414;
+  --status-idle-fg: #c8c8c8;
+}
+
+html:not(.light) {
+  /* Layers, darkest to lightest: rail, page, side panel, card, chosen, raised control. */
+  --hub-rail: #161616;
+  --color-bg: #0e0e0e;
+  --color-raised: #1c1c1c;
+  --color-surface: #242424;
+  --color-surface-2: #2c2c2c;
+  --color-surface-3: #353535;
+  --color-text: #ffffff;
+  --color-text-2: #ededed;
+  --color-text-3: #c8c8c8;
+  --color-border-hi: rgba(255,255,255,0.16);
+  --color-accent-soft: rgba(124,124,246,0.20);
+  --color-accent-bright: #c4c5ff;
+  --color-ai-bubble: #1f1f1f;
+  --color-glass: rgba(24,24,24,0.92);
+  --color-glass-border: rgba(255,255,255,0.10);
+}
+
+/* SwarmClaw's @theme is "inline": bg-raised, text-text-3 and the rest carry their colors baked in,
+   so the variables above alone don't reach them. These rules set the classes themselves. */
+html:not(.light) .bg-bg { background-color: var(--color-bg); }
+html:not(.light) .bg-raised { background-color: var(--color-raised); }
+html:not(.light) .bg-surface { background-color: var(--color-surface); }
+html:not(.light) .bg-surface-2 { background-color: var(--color-surface-2); }
+html:not(.light) .bg-surface-3 { background-color: var(--color-surface-3); }
+html:not(.light) .hover\:bg-surface-2:hover { background-color: var(--color-surface-2); }
+html:not(.light) .hover\:bg-surface-3:hover { background-color: var(--color-surface-3); }
+html:not(.light) [class*="bg-surface/"]:not([class*="hover:bg-surface/"]) { background-color: var(--color-surface); }
+html:not(.light) [class*="bg-raised/"] { background-color: var(--color-raised); }
+html:not(.light) .bg-glass { background-color: var(--color-glass); }
+html:not(.light) .bg-accent-soft { background-color: var(--color-accent-soft); }
+html:not(.light) .text-text { color: var(--color-text); }
+html:not(.light) .text-text-2 { color: var(--color-text-2); }
+html:not(.light) .text-text-3 { color: var(--color-text-3); }
+html:not(.light) .text-accent-bright { color: var(--color-accent-bright); }
+html:not(.light) .hover\:text-text:hover,
+html:not(.light) .hover\:text-text-2:hover { color: #ffffff; }
+
+/* The rail (icons + section list) is darker than the panel beside it, like Poka. */
+html:not(.light) [data-hub-rail] { background-color: var(--hub-rail); }
+
+/* Faint white fills become real gray steps, so a card stands out from the page behind it. */
+html:not(.light) .bg-white\/\[0\.01\] { background-color: rgba(255,255,255,0.035); }
+html:not(.light) .bg-white\/\[0\.02\] { background-color: rgba(255,255,255,0.05); }
+html:not(.light) .bg-white\/\[0\.025\] { background-color: rgba(255,255,255,0.055); }
+html:not(.light) .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.06); }
+html:not(.light) .bg-white\/\[0\.035\] { background-color: rgba(255,255,255,0.065); }
+html:not(.light) .bg-white\/\[0\.04\] { background-color: rgba(255,255,255,0.07); }
+html:not(.light) .bg-white\/\[0\.05\] { background-color: rgba(255,255,255,0.08); }
+html:not(.light) .bg-white\/\[0\.06\] { background-color: rgba(255,255,255,0.09); }
+html:not(.light) .bg-white\/\[0\.07\] { background-color: rgba(255,255,255,0.10); }
+html:not(.light) .bg-white\/\[0\.08\] { background-color: rgba(255,255,255,0.11); }
+html:not(.light) .bg-white\/\[0\.1\],
+html:not(.light) .bg-white\/\[0\.10\] { background-color: rgba(255,255,255,0.13); }
+html:not(.light) .bg-white\/\[0\.12\] { background-color: rgba(255,255,255,0.15); }
+
+html:not(.light) .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(255,255,255,0.07); }
+html:not(.light) .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(255,255,255,0.08); }
+html:not(.light) .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(255,255,255,0.09); }
+html:not(.light) .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(255,255,255,0.10); }
+html:not(.light) .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(255,255,255,0.11); }
+html:not(.light) .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(255,255,255,0.12); }
+html:not(.light) .hover\:bg-white\/\[0\.08\]:hover { background-color: rgba(255,255,255,0.13); }
+html:not(.light) .hover\:bg-white\/\[0\.1\]:hover,
+html:not(.light) .hover\:bg-white\/\[0\.10\]:hover { background-color: rgba(255,255,255,0.15); }
+
+html:not(.light) .border-white\/\[0\.03\] { border-color: rgba(255,255,255,0.07); }
+html:not(.light) .border-white\/\[0\.04\] { border-color: rgba(255,255,255,0.08); }
+html:not(.light) .border-white\/\[0\.05\] { border-color: rgba(255,255,255,0.09); }
+html:not(.light) .border-white\/\[0\.06\] { border-color: rgba(255,255,255,0.10); }
+html:not(.light) .border-white\/\[0\.08\] { border-color: rgba(255,255,255,0.12); }
+
+/* SwarmClaw's fixed blue-purple blacks become plain grays. */
+html:not(.light) .bg-\[\#0a0a14\] { background-color: #111111; }
+html:not(.light) .bg-\[\#12121e\],
+html:not(.light) .bg-\[\#13131e\],
+html:not(.light) .bg-\[\#1b1620\] { background-color: #1c1c1c; }
+html:not(.light) .bg-\[\#16162a\],
+html:not(.light) .bg-\[\#171a2b\],
+html:not(.light) .bg-\[\#1a1a2e\],
+html:not(.light) .bg-\[\#1a1a3a\],
+html:not(.light) .bg-\[\#1e1e38\],
+html:not(.light) .bg-\[\#1e2140\],
+html:not(.light) .bg-\[\#1e2238\] { background-color: #262626; }
+
+/* Faded gray text (text-text-3/40 and the like) becomes readable. Inputs keep their own typed color. */
+html:not(.light) :not(input):not(textarea)[class*="text-text-3/"] { color: #bdbdbd; }
+html:not(.light) :not(input):not(textarea)[class*="text-text-2/"] { color: #e0e0e0; }
+html:not(.light) ::placeholder { color: #9a9a9a; }
+
+/* What is hovered, focused or chosen glows in its own color. */
+html:not(.light) :is(button, a, [role="tab"], [role="option"], [role="menuitem"]):is(:hover, :focus-visible),
+html:not(.light) :is([aria-current="page"], [aria-selected="true"], [aria-pressed="true"], [data-state="active"]) {
+  text-shadow: 0 0 10px color-mix(in srgb, currentColor 55%, transparent);
+}
+html:not(.light) :is(button, a, [role="tab"], [role="option"]):focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
