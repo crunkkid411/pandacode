@@ -6,6 +6,7 @@ mod hub;
 mod hub_org;
 mod hub_skills;
 mod hub_templates;
+mod hub_lists;
 mod hub_tts;
 mod hub_tools;
 mod hub_voice;
@@ -4146,6 +4147,11 @@ pub fn run() {
                     hub_templates::hub_agent_templates,
                     hub_templates::hub_agent_template,
                     hub_tts::hub_speak,
+                    // Task Board and Inbox: JOBS.md and inbox.txt, read only.
+                    hub_lists::hub_read_list,
+                    hub_lists::hub_inbox_add,
+                    hub_lists::hub_inbox_install,
+                    hub_lists::hub_open_link,
                     // Chat box: "+" pictures, "/" commands, the model menu and /rename.
                     import_prompt_image,
                     list_slash_commands,

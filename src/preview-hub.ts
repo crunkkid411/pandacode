@@ -176,6 +176,17 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
   ] as T;
   if (command === 'hub_speak') return new ArrayBuffer(0) as T;
+  if (command === 'hub_inbox_add' || command === 'hub_inbox_install' || command === 'hub_open_link') return null as T;
+  if (command === 'hub_read_list') return (args.name === 'jobs' ? [
+    '## Index, in build order', '', '| Job | Label | One sentence |', '|---|---|---|',
+    '| J02 | DONE (2026-11-09) | Fix the Planner crash. |', '| J06 | READY | Check Vibe\'s graph. |',
+    '| J26 | NEEDS_DECISIONS | The main assistant. |', '', '# READY', '',
+    '## J06. Is Vibe\'s graph real? (READY)', '', 'Check whether the graph is real, then report it plainly.', '',
+    '# NEEDS_DECISIONS', '', '## J26. The main assistant', '', 'Jordan decides.', '',
+  ] : [
+    '# Double-click "Install Inbox" on the desktop', '', 'https://github.com/JuneYaooo/rea-video', 'https://github.com/noblehacks/frenemy', '',
+    '=== DONE ===', '2026-11-12 | https://github.com/only-cli/oc | INSTALLED as CLI "oc" | use: oc open <url>',
+  ]).join('\n') as T;
   if (command === 'plugin:dialog|open') return ((window as any).__hubPick ?? null) as T;
   if (command === 'import_prompt_image') return { id: `img-${args.path ?? args.name}`, name: 'pic.png', width: 1, height: 1, thumbnail: 'data:image/png;base64,iVBORw0KGgo=' } as T;
   if (command === 'hub_agent_templates') return [

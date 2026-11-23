@@ -4,6 +4,8 @@ import { botSchedules, createBotSchedule, preview, PREFIX, scheduleOwner, scSche
 import { loadLibrary } from './bot-skills';
 import { isChatProject } from '../chats';
 import { boardTasks, createBoardTask, settleDone, updateBoardTask } from './board-tasks';
+import { JOB_PREFIX, jobBoardTasks, startJob } from './jobs-md';
+import { parseInbox } from './inbox';
 import { forSend, spoken, uploadPicture } from './attachments';
 import { chatCommands, forwardMentions, slashParts } from './chat-commands';
 
@@ -258,6 +260,10 @@ function saved(): Saved {
 function save(next: Saved) { try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* the choice just won't stick */ } }
 const BASE_SETTINGS = { userName: 'Jordan', setupCompleted: true };
 
+/** A board card is a PandaCode task, or a JOBS.md job (which can only be handed to an agent). */
+const updateAnyTask = (call: Call, id: string, patch: Partial<BoardTask>) =>
+  id.startsWith(JOB_PREFIX) ? startJob(call, id, patch, createBoardTask) : updateBoardTask(call, id, patch);
+
 export const routes: Route[] = [
   { method: 'PUT', path: /^\/settings$/, run: async ({ body }) => {
     const s = saved();
@@ -403,13 +409,27 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/providers\/configs$/, run: async () => [] },
   { method: 'GET', path: /^\/usage$/, run: ({ call, query }) => usage(call, query.get('range') ?? '7d') },
   { method: 'GET', path: /^\/tasks\/metrics$/, run: async () => null },
-  // Task Board: PandaCode's tasks (board-tasks.ts).
-  { method: 'GET', path: /^\/tasks$/, run: ({ call, query }) => boardTasks(call, query.get('includeArchived') === 'true') },
+  // Inbox: Jordan's inbox.txt (inbox.ts).
+  { method: 'GET', path: /^\/hub-inbox$/, run: async ({ call }) => parseInbox(await call<string>('hub_read_list', { name: 'inbox' })) },
+  { method: 'POST', path: /^\/hub-inbox$/, run: async ({ call, body }) => {
+    const { link = '', note = '' } = (body ?? {}) as { link?: string; note?: string };
+    await call('hub_inbox_add', { link, note });
+    return parseInbox(await call<string>('hub_read_list', { name: 'inbox' }));
+  } },
+  { method: 'POST', path: /^\/hub-inbox\/install$/, run: async ({ call }) => { await call('hub_inbox_install'); return { ok: true }; } },
+  { method: 'POST', path: /^\/hub-inbox\/open$/, run: async ({ call, body }) => { await call('hub_open_link', { url: (body as { url?: string })?.url ?? '' }); return { ok: true }; } },
+  // Task Board: PandaCode's tasks (board-tasks.ts) and Jordan's JOBS.md jobs (jobs-md.ts).
+  { method: 'GET', path: /^\/tasks$/, run: async ({ call, query }) => {
+    const all = query.get('includeArchived') === 'true';
+    const own = await boardTasks(call, true);
+    const jobs = await jobBoardTasks(call, Object.values(own).map(t => t.title), all);
+    return { ...jobs, ...(all ? own : Object.fromEntries(Object.entries(own).filter(([, t]) => t.status !== 'archived'))) };
+  } },
   { method: 'POST', path: /^\/tasks$/, run: ({ call, body }) => createBoardTask(call, (body ?? {}) as Partial<BoardTask>) },
-  { method: 'PUT', path: /^\/tasks\/([^/]+)$/, run: ({ call, match, body }) => updateBoardTask(call, decodeURIComponent(match[1]), (body ?? {}) as Partial<BoardTask>) },
+  { method: 'PUT', path: /^\/tasks\/([^/]+)$/, run: ({ call, match, body }) => updateAnyTask(call, decodeURIComponent(match[1]), (body ?? {}) as Partial<BoardTask>) },
   { method: 'POST', path: /^\/tasks\/bulk$/, run: async ({ call, body }) => {
     const { ids = [], ...patch } = (body ?? {}) as { ids?: string[] } & Partial<BoardTask>;
-    for (const id of ids) await updateBoardTask(call, id, patch);
+    for (const id of ids) await updateAnyTask(call, id, patch);
     return { updated: ids.length, ids };
   } },
   { method: 'DELETE', path: /^\/tasks$/, run: ({ call }) => settleDone(call) },

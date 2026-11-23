@@ -9,8 +9,8 @@ const open = (page: Page, path: string) => page.goto(`/hub.html#${path}`);
 
 test('sidebar shows only SwarmClaw pages that have real data, with SwarmClaw names', async ({ page }) => {
   await open(page, '/org-chart');
-  for (const name of ['Org Chart', 'Skills', 'Providers', 'Usage', 'Style Guide']) await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
-  for (const hidden of ['Inbox', 'Wallets', 'Secrets', 'Marketplace', 'Star on GitHub', 'Join Discord']) await expect(page.getByText(hidden, { exact: true })).toHaveCount(0);
+  for (const name of ['Org Chart', 'Inbox', 'Skills', 'Providers', 'Usage', 'Style Guide']) await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+  for (const hidden of ['Wallets', 'Secrets', 'Marketplace', 'Star on GitHub', 'Join Discord']) await expect(page.getByText(hidden, { exact: true })).toHaveCount(0);
 });
 
 test('an unwired page address goes back to the Org Chart', async ({ page }) => {
@@ -333,6 +333,51 @@ test('agents: any installed harness; skills, slash commands, MCP servers and a w
   await expect.poll(async () => (await calls(page, 'skills_import_folder')).map(c => c.args.path)).toEqual(['C:/oc/deploy.md']); // agent-firefox is already in the library
   await expect.poll(async () => (await calls(page, 'bot_set_capabilities')).map(c => [c.args.skills, c.args.mcp])).toEqual([[['deploy', 'agent-firefox'], ['github']]]);
   await expect.poll(async () => (await calls(page, 'bot_set_work_project')).map(c => c.args.projectId)).toEqual(['p1']);
+});
+
+test('inbox: inbox.txt links waiting and installed; add a link, open one, install them now', async ({ page }) => {
+  await open(page, '/inbox');
+  await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
+  const waiting = page.getByRole('region', { name: 'Waiting' });
+  await expect(waiting.getByRole('button', { name: 'github.com/JuneYaooo/rea-video' })).toBeVisible();
+  await expect(waiting.getByRole('listitem')).toHaveCount(2);
+  const installed = page.getByRole('region', { name: 'Installed' });
+  await expect(installed.getByText('oc open <url>')).toBeVisible();
+
+  await page.getByLabel('Link', { exact: true }).fill('https://github.com/x/y');
+  await page.getByLabel('Note', { exact: true }).fill('for thumbnails');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'hub_inbox_add')).map(c => [c.args.link, c.args.note])).toEqual([['https://github.com/x/y', 'for thumbnails']]);
+  await expect(page.getByLabel('Link', { exact: true })).toHaveValue('');
+
+  await waiting.getByRole('button', { name: 'github.com/noblehacks/frenemy' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_open_link')).map(c => c.args.url)).toEqual(['https://github.com/noblehacks/frenemy']);
+  await page.getByRole('button', { name: 'Install them now' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_inbox_install')).length).toBe(1);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-inbox.png`, fullPage: true });
+});
+
+test('task board: JOBS.md jobs are cards; a ready job starts as a real task, a decision job never starts', async ({ page }) => {
+  await open(page, '/tasks');
+  const job = (text: string) => page.locator('[draggable]').filter({ hasText: text });
+  await expect(job("J06. Is Vibe's graph real?")).toBeVisible();
+  await expect(job("J06. Is Vibe's graph real?").getByText('JOBS.md', { exact: true })).toBeVisible();
+  await expect(job('J26. The main assistant').getByText('Needs your decision', { exact: true })).toBeVisible();
+  await expect(page.getByText('J02. Fix the Planner crash')).toHaveCount(0); // done: behind Show Archived
+
+  const put = (id: string, patch: object) => page.evaluate(async ([i, p]) => { const r = await fetch(`/api/tasks/${i}`, { method: 'PUT', body: JSON.stringify(p) }); return [r.status, await r.text()]; }, [id, patch] as const);
+  expect((await put('job:J26', { status: 'running' }))[1]).toContain('waits for your decision');
+  expect((await put('job:J06', { title: 'renamed' }))[1]).toContain('X:\\\\AI-2\\\\JOBS.md');
+  expect(await calls(page, 'chat_create')).toHaveLength(0);
+
+  await job("J06. Is Vibe's graph real?").hover();
+  await job("J06. Is Vibe's graph real?").getByRole('button', { name: 'Start', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'update_task_details')).map(c => c.args.title)).toContain("J06. Is Vibe's graph real?");
+  const made = (await calls(page, 'update_task_details')).find(c => c.args.title.startsWith('J06.'));
+  expect(made.args.description).toContain('Check whether the graph is real');
+  expect(made.args.description).toContain('Job J06 from X:\\AI-2\\JOBS.md');
+  // The job card steps aside for its task.
+  await expect.poll(() => page.evaluate(async () => Object.keys(await (await fetch('/api/tasks')).json()).includes('job:J06'))).toBe(false);
 });
 
 test('task board: PandaCode tasks by stage; a new task handed to an agent starts with its brief, then waits for review', async ({ page }) => {

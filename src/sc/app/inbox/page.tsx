@@ -1,7 +1,8 @@
 'use client'
 
-import { ConnectorInbox } from '@/components/connectors/connector-inbox'
+// Hub: the Inbox is Jordan's inbox.txt (src/sc-hub/inbox-page.tsx), not SwarmClaw's connector inbox.
+import { HubInbox } from '../../../sc-hub/inbox-page'
 
 export default function InboxPage() {
-  return <ConnectorInbox />
+  return <HubInbox />
 }

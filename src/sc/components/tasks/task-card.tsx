@@ -333,7 +333,7 @@ export function TaskCard({
             {project.name}
           </span>
         )}
-        <span className="text-[11px] text-text-3">{timeAgo(task.updatedAt, now)}</span>
+        {/* Hub: JOBS.md jobs have no date of their own. */ task.id.startsWith('job:') ? null : <span className="text-[11px] text-text-3">{timeAgo(task.updatedAt, now)}</span>}
         {task.comments && task.comments.length > 0 && (
           <span className="flex items-center gap-1 text-[11px] text-text-3">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-text-3/60">

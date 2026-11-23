@@ -23,8 +23,8 @@ B. Look
 - [x] real logos instead of harness names
 
 C. Pages (each with real data)
-- [ ] Task Board <- JOBS.md
-- [ ] Inbox <- inbox.txt (+ agent notifications)
+- [x] Task Board <- JOBS.md (read only; Start turns a job into a PandaCode task)
+- [x] Inbox <- inbox.txt (add link, open link, Install them now). Agent notifications: not yet
 - [ ] Projects, Sessions/Runs, Memory, Activity
 - [ ] MCP servers, Extensions (plugins), Connectors, Webhooks
 - [ ] Chatrooms, Knowledge (qmd), Missions, Quality, Feed
