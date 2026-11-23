@@ -223,7 +223,7 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     library.push(item);
     return { ...item } as T;
   }
-  if (command === 'capabilities_inventory') return { entries: [{ harness: 'claude', kind: 'mcp server', name: 'github', source: 'Claude Code settings' }, { harness: 'opencode', kind: 'mcp server', name: 'github', source: 'OpenCode config' }] } as T;
+  if (command === 'capabilities_inventory') return { entries: [{ harness: 'claude', kind: 'mcp server', name: 'github', source: 'Claude Code settings' }, { harness: 'opencode', kind: 'mcp server', name: 'github', source: 'OpenCode config' }, { harness: 'claude', kind: 'plugin', name: 'superpowers@claude-plugins-official', source: '~/.claude/settings.json' }, { harness: 'claude', kind: 'plugin', name: 'ponytail@ponytail', source: '~/.claude/settings.json' }] } as T;
   if (command === 'list_projects') return [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }, { id: 'pold', name: 'Hub check (delete me)', path: 'C:/Users/x/PandaCode Bots/hub-check', addedOrder: 3 }] as T;
   if (command === 'bot_project_ids') return ['pb1'] as T;
   if (command === 'bot_set_work_project') { const b = botById(args.botId); b.workProject = args.projectId ?? ''; return { ...b } as T; }

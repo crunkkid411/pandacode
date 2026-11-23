@@ -1,21 +1,9 @@
 'use client'
 
-import { SidebarPanelShell } from '@/components/layout/sidebar-panel-shell'
 import { MainContent } from '@/components/layout/main-content'
-import { McpServerList } from '@/components/mcp-servers/mcp-server-list'
-import { useAppStore } from '@/stores/use-app-store'
 
+// Hub: no side list. SwarmClaw's MCP server store needs its own server; the page shows the servers
+// Jordan's harnesses already have (src/sc-hub/capability-page.tsx).
 export default function McpServersLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <SidebarPanelShell
-        title="MCP Servers"
-        createLabel="MCP Server"
-        onNew={() => useAppStore.getState().setMcpServerSheetOpen(true)}
-      >
-        <McpServerList />
-      </SidebarPanelShell>
-      <MainContent>{children}</MainContent>
-    </>
-  )
+  return <MainContent>{children}</MainContent>
 }

@@ -1,5 +1,6 @@
 // The Hub's Extensions page: Jordan's install list, inbox.txt (SwarmClaw: "install extensions from ... a URL"). Links waiting to be installed (add one, or install them all
 // with the same session the desktop "Install Inbox" shortcut starts), then what got installed and how to use it.
+import { CapabilityGroups } from './capability-page';
 import { useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/app/api-client';
@@ -103,6 +104,12 @@ export function InstallList() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section aria-label="Plugins" className="mt-10">
+        <h2 className="text-[20px] font-700 text-text mb-1">Plugins in your harnesses</h2>
+        <p className="text-[14px] text-text-2 mb-4">What each harness already has installed.</p>
+        <CapabilityGroups kind="plugin" noun="plugins" />
       </section>
     </div>
   );

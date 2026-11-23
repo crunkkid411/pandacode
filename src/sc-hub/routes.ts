@@ -319,6 +319,12 @@ export const routes: Route[] = [
   } },
   { method: 'GET', path: /^\/projects$/, run: ({ call }) => projects(call) },
   { method: 'GET', path: /^\/mcp-servers$/, run: ({ call }) => mcpServers(call) },
+  // What the harnesses have set up, one kind at a time (capability-page.tsx): "mcp server", "plugin".
+  { method: 'GET', path: /^\/hub-capabilities$/, run: async ({ call, query }) => {
+    const kind = query.get('kind') ?? '';
+    const inv = await call<{ entries: { harness: string; kind: string; name: string; state: string; source: string; command?: string | null }[] }>('capabilities_inventory', { taskId: null });
+    return inv.entries.filter(e => e.kind === kind).map(e => ({ ...e, command: e.command ?? null }));
+  } },
   { method: 'GET', path: /^\/providers\/([^/]+)\/discover-models$/, run: ({ call, match, query }) => discoverModels(call, decodeURIComponent(match[1]), query.get('force') === '1') },
   // The form saves the discovered list back; the engine already caches it, so nothing to store.
   { method: 'PUT', path: /^\/providers\/([^/]+)\/models$/, run: async () => ({ ok: true }) },

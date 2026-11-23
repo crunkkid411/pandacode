@@ -473,3 +473,17 @@ test('projects: his project folders (bot workspaces left out) with their chats',
   await expect(page.getByRole('region', { name: 'Project' }).getByRole('list', { name: 'Sessions' }).getByRole('button')).toHaveCount(2);
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-projects.png`, fullPage: true });
 });
+
+test('mcp servers and plugins: what each harness has set up, grouped under its logo; no add buttons that would not work', async ({ page }) => {
+  await open(page, '/mcp-servers');
+  await expect(page.getByRole('heading', { name: 'MCP Servers', exact: true })).toBeVisible();
+  for (const h of ['Claude Code', 'OpenCode']) await expect(page.getByRole('region', { name: h }).getByText('github', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MCP Server/ })).toHaveCount(0);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-mcp-servers.png`, fullPage: true });
+  await open(page, '/extensions');
+  const plugins = page.getByRole('region', { name: 'Plugins' });
+  await expect(plugins.getByText('superpowers', { exact: true })).toBeVisible();
+  await plugins.getByLabel('Find plugins').fill('pony');
+  await expect(plugins.getByText('superpowers', { exact: true })).toHaveCount(0);
+  await expect(plugins.getByText('ponytail', { exact: true })).toBeVisible();
+});
