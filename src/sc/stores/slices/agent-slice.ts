@@ -4,6 +4,7 @@ import type { Session, Agent, ExternalAgentRuntime } from '../../types'
 import { fetchAgents, bulkPatchAgents } from '../../lib/agents'
 import { api } from '@/lib/app/api-client'
 import { safeStorageRemove, safeStorageSet } from '@/lib/app/safe-storage'
+import { rememberedAgentChat } from './session-slice'
 import { invalidateFingerprint, setIfChanged } from '../set-if-changed'
 import { createLoader, createInflightDeduplicator } from '../store-utils'
 
@@ -32,10 +33,10 @@ export const createAgentSlice: StateCreator<AppState, [], [], AgentSlice> = (set
       return
     }
     if (get().currentAgentId === id && get().agents[id]?.threadSessionId) {
-      set({ activeSessionIdOverride: null })
+      set({ activeSessionIdOverride: rememberedAgentChat(get(), id) })
       return
     }
-    set({ currentAgentId: id, activeSessionIdOverride: null })
+    set({ currentAgentId: id, activeSessionIdOverride: rememberedAgentChat(get(), id) })
     safeStorageSet('sc_agent', id)
 
     await agentThreadDedup.dedup(id, async () => {

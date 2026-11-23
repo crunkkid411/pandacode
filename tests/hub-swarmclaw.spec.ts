@@ -465,13 +465,52 @@ test('sessions: every live chat with its state as color and word; Ctrl+click pic
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-sessions.png`, fullPage: true });
 });
 
-test('projects: his project folders (bot workspaces left out) with their chats', async ({ page }) => {
+test('projects: his project folders, then each agent\'s own folder by name; Add a project folder adds one', async ({ page }) => {
   await open(page, '/projects');
   const projects = page.getByRole('region', { name: 'Projects' });
-  await expect(projects.getByRole('button')).toHaveCount(1);
+  await expect(projects.getByRole('button')).toHaveCount(2);
   await expect(projects.getByText('pandacode', { exact: true })).toBeVisible();
+  await expect(projects.getByText("Chief of Staff's own folder")).toBeVisible();
+  await expect(projects.getByText('Hub check (delete me)')).toHaveCount(0); // a deleted agent's folder stays out
   await expect(page.getByRole('region', { name: 'Project' }).getByRole('list', { name: 'Sessions' }).getByRole('button')).toHaveCount(2);
+  await page.getByRole('button', { name: /Add a project folder/ }).click();
+  await expect(projects.getByText('new-project', { exact: true })).toBeVisible();
+  await expect.poll(async () => (await calls(page, 'add_project')).map(c => c.args.path)).toEqual(['/Users/you/Projects/new-project']);
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-projects.png`, fullPage: true });
+});
+
+test('agents: New chat with an agent stays that agent\'s chat, in its mode, and is still there after switching agents', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('first thing');
+  await box.press('Enter');
+  await expect(page.getByText('Done: first thing').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Start a new chat session' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_assign_task')).map(c => c.args.botId)).toEqual(['b1']);
+  const made = (await calls(page, 'chat_create')).at(-1).args;
+  expect([made.provider, made.mode]).toEqual(['claude', 'ask']); // the agent's own program and mode
+  await box.fill('second thing');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'send_message')).map(c => String(c.args.text).split('\n')[0])).toEqual(['second thing']);
+  await expect(page.getByText('second thing').first()).toBeVisible();
+  await open(page, '/agents/b2');
+  await expect(page.getByText('second thing')).toHaveCount(0);
+  await open(page, '/agents/b1');
+  await expect(page.getByText('second thing').first()).toBeVisible();
+  await expect(page.getByText('first thing')).toHaveCount(0);
+});
+
+test('agent settings: Works in shows its own folder, or the project picked for it', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('hello');
+  await box.press('Enter');
+  await expect(page.getByText('Done: hello').first()).toBeVisible();
+  if (!(await page.getByRole('button', { name: 'Close inspector' }).isVisible())) await page.getByRole('button', { name: 'Toggle inspector' }).click();
+  await page.getByRole('tab', { name: 'Config', exact: true }).click();
+  const works = page.getByRole('region', { name: 'Works in' });
+  await expect(works.getByText('Its own folder')).toBeVisible();
+  await expect(works.getByText('C:/Bots/chief')).toBeVisible();
 });
 
 test('mcp servers and plugins: what each harness has set up, grouped under its logo; no add buttons that would not work', async ({ page }) => {

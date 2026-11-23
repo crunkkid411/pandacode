@@ -554,7 +554,7 @@ export function mountBots(host: HTMLElement, options: BotsOptions): BotsView {
     const name = draft.name.trim(), purpose = draft.purpose.trim();
     if (!name) { nameError = 'Give the bot a name.'; render(); pane.querySelector<HTMLInputElement>('input[name=name]')?.focus(); return; }
     nameError = '';
-    const input: BotInput = { name, role: draft.role, instructions: purpose, goals: '', avatar: draft.avatar, color: draft.color, provider: draft.provider as ProviderId, model: draft.model, mode: 'ask', heartbeatMinutes: draft.heartbeatMinutes, reasoningEffort: draft.reasoningEffort, backupModels: [], fallbackMode: 'ask', notify: true, whileWorking: 'queue', showPlan: false };
+    const input: BotInput = { name, role: draft.role, instructions: purpose, goals: '', avatar: draft.avatar, color: draft.color, provider: draft.provider as ProviderId, model: draft.model, mode: draft.provider === 'claude' ? 'review' : 'ask', heartbeatMinutes: draft.heartbeatMinutes, reasoningEffort: draft.reasoningEffort, backupModels: [], fallbackMode: 'ask', notify: true, whileWorking: 'queue', showPlan: false };
     creating = true; render();
     void work(async () => {
       try {

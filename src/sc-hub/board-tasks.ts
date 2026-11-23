@@ -7,6 +7,7 @@
 import type { BoardTask, BoardTaskStatus } from '../sc/types';
 import { isChatProject } from '../chats';
 import { listBots, type Bot } from './bot-agents';
+import { startMode } from './mode-facts';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -124,10 +125,11 @@ export async function createBoardTask(call: Call, data: Partial<BoardTask>): Pro
   if (data.agentId && !bot) throw new Error('That agent no longer exists.');
   // ponytail: with no agent, Claude Code (his sign-in subscription) on its default model.
   const provider = bot?.provider ?? 'claude', model = bot?.model ?? 'default', description = data.description ?? '';
+  const mode = bot?.mode || startMode(provider, 'full'); // the agent's own mode; Claude Code alone starts in Auto
   let t: PcTask;
-  if (data.projectId) t = await call<PcTask>('create_board_task', { projectId: data.projectId, provider, model, mode: 'full', title, description });
+  if (data.projectId) t = await call<PcTask>('create_board_task', { projectId: data.projectId, provider, model, mode, title, description });
   else {
-    t = await call<PcTask>('chat_create', { provider, model, mode: 'full' });
+    t = await call<PcTask>('chat_create', { provider, model, mode });
     t = await call<PcTask>('update_task_details', { sessionId: t.id, title, description });
   }
   if (bot) await assign(call, t, bot.id, bots);

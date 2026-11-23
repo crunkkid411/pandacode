@@ -37,7 +37,7 @@ async function mcpServers(call: Call) {
 import { work, type Ledger } from '../hub/usage-facts';
 import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
 import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, pcProvider, scProvider, updateBotAgent, setBotMode } from './bot-agents';
-import { MODES } from './mode-facts';
+import { MODES, startMode } from './mode-facts';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 interface Ctx { call: Call; match: RegExpMatchArray; query: URLSearchParams; body: unknown }
@@ -68,6 +68,13 @@ function chatSession(c: Chat, agentId: string | null = null) {
 /** The bot whose own thread this conversation is, if any. */
 const botNames = async (call: Call) => Object.fromEntries((await listBots(call)).map(b => [b.id, b.name]));
 const botOfThread = async (call: Call, sessionId: string) => (await listBots(call)).find(b => b.desktopSession === sessionId)?.id ?? null;
+/** Which agent each chat belongs to: its own thread, or a chat handed to it (bot_tasks). */
+async function chatOwners(call: Call): Promise<Map<string, string>> {
+  const [bots, links] = await Promise.all([listBots(call), call<Record<string, string>>('bot_task_links')]);
+  const owner = new Map(Object.entries(links));
+  for (const b of bots) if (b.desktopSession) owner.set(b.desktopSession, b.id);
+  return owner;
+}
 
 /** PandaCode's message rows in SwarmClaw's shape. Errors show as the agent's reply with a warning sign. */
 // ponytail: tool and system rows are left out; add them as SwarmClaw toolEvents if he wants to see them.
@@ -91,7 +98,11 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500, 
         // An agent's own thread goes through the bot, so it gets its brief, team and queue.
         const botId = await botOfThread(call, id);
         if (botId) await call('bot_message', { botId, text, imageIds, moodboardIds: [] });
-        else await call('send_message', { sessionId: id, text, imageIds, moodboardIds: [] });
+        else {
+          // A chat handed to an agent carries the agent's brief on its first message (and after the brief changes).
+          const brief = await call<string | null>('bot_task_brief', { sessionId: id }).catch(() => null) ?? '';
+          await call('send_message', { sessionId: id, text: text + brief, imageIds, moodboardIds: [] });
+        }
         const started = Date.now();
         let shown = '', errors = 0, sawWork = false;
         while (Date.now() - started < 60 * 60_000) {
@@ -158,7 +169,7 @@ async function chatMessages(call: Call, id: string, limit: string | null) {
 async function oneChat(call: Call, id: string) {
   const c = (await call<Chat[]>('list_sessions')).find(x => x.id === id);
   if (!c) throw new Error('That chat no longer exists in PandaCode.');
-  return chatSession(c, await botOfThread(call, id));
+  return chatSession(c, (await chatOwners(call)).get(id) ?? null);
 }
 
 interface HubSkill { kind: string; name: string; description: string; places: string[]; path: string; ours: boolean }
@@ -291,13 +302,16 @@ async function hubSessions(call: Call) {
   ]);
   const own = new Set(botFolders);
   const folders = list.filter(p => !own.has(p.id) && !isChatProject(p) && !BOT_FOLDER.test(p.path));
-  const people = bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null, desktopSession: b.desktopSession, projectId: b.projectId }));
+  // Each agent's own folder is listed too, named for its agent, so he can see where every agent works.
+  const homes = bots.flatMap(b => list.filter(p => p.id === b.projectId).map(p => ({ ...p, owner: b.name })));
+  // An agent shows in the project it works in (its work project), else in its own folder.
+  const people = bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null, desktopSession: b.desktopSession, projectId: b.workProject || b.projectId }));
   const rows = sessionRows(sessions, list, people, links, {
     stateOf: chatState,
     seedFor: s => mascotSeed(mascotKind(s.provider, s.model), s.provider, '', 0, ''),
     nameFor: p => HARNESSES[p]?.name ?? p,
   });
-  return { rows, projects: projectRows(folders, rows, people) };
+  return { rows, projects: [...projectRows(folders, rows, people), ...projectRows(homes, rows, people)] };
 }
 
 /** A board card is a PandaCode task, or a JOBS.md job (which can only be handed to an agent). */
@@ -346,8 +360,7 @@ export const routes: Route[] = [
   } },
   // Each bot's own thread keeps its agentId, or every refresh "un-agents" the open chat and its settings panel closes.
   { method: 'GET', path: /^\/chats$/, run: async ({ call }) => {
-    const [chats, bots] = await Promise.all([pcChats(call), listBots(call)]);
-    const owner = new Map(bots.filter(b => b.desktopSession).map(b => [b.desktopSession, b.id]));
+    const [chats, owner] = await Promise.all([pcChats(call), chatOwners(call)]);
     return Object.fromEntries(chats.map(c => [c.id, chatSession(c, owner.get(c.id) ?? null)]));
   } },
   { method: 'GET', path: /^\/chats\/([^/]+)$/, run: ({ call, match }) => oneChat(call, match[1]) },
@@ -427,10 +440,18 @@ export const routes: Route[] = [
   } },
   { method: 'POST', path: /^\/chats\/([^/]+)\/stop$/, run: async ({ call, match }) => { await call('stop_session', { sessionId: match[1] }); return { ok: true }; } },
   // "New chat" in SwarmClaw's chat header: a fresh PandaCode chat with the same agent and model.
+  // From an agent's chat it stays that agent's chat: its program, model and mode, handed to it so it gets its brief.
   { method: 'POST', path: /^\/chats$/, run: async ({ call, body }) => {
-    const b = (body ?? {}) as { provider?: string; model?: string };
+    const b = (body ?? {}) as { provider?: string; model?: string; agentId?: string | null };
+    const bot = b.agentId ? (await listBots(call)).find(x => x.id === b.agentId) : undefined;
+    if (bot) {
+      const made = await call<Chat>('chat_create', { provider: bot.provider, model: bot.model || 'default', mode: bot.mode });
+      await call('bot_assign_task', { sessionId: made.id, botId: bot.id });
+      return chatSession(made, bot.id);
+    }
     if (!b.provider) throw new Error('Pick an agent first.');
-    return chatSession(await call<Chat>('chat_create', { provider: pcProvider(b.provider), model: b.model || 'default', mode: 'full' }));
+    const provider = pcProvider(b.provider ?? '');
+    return chatSession(await call<Chat>('chat_create', { provider, model: b.model || 'default', mode: startMode(provider, 'full') }));
   } },
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-pack$/, run: async ({ call, match }) => {
     const c = await oneChat(call, match[1]);
@@ -560,6 +581,21 @@ export const routes: Route[] = [
   { method: 'POST', path: /^\/hub-knowledge\/get$/, run: ({ call, body }) => call('hub_knowledge_get', { file: ((body ?? {}) as { file?: string }).file ?? '' }) },
   // Sessions and Projects (sessions-facts.ts). Stop works on the whole selection.
   { method: 'GET', path: /^\/hub-sessions$/, run: ({ call }) => hubSessions(call) },
+  { method: 'GET', path: /^\/agents\/([^/]+)\/folder$/, run: async ({ call, match }) => {
+    const [bots, list] = await Promise.all([listBots(call), call<PcProject[]>('list_projects')]);
+    const bot = bots.find(b => b.id === decodeURIComponent(match[1]));
+    if (!bot) throw new Error('That agent no longer exists.');
+    const work = bot.workProject ? list.find(p => p.id === bot.workProject) : undefined;
+    const home = list.find(p => p.id === bot.projectId);
+    const at = work ?? home;
+    return { name: at?.name ?? bot.name, path: (at?.path ?? '').replace(/^\\\\\?\\/, ''), own: !work };
+  } },
+  { method: 'POST', path: /^\/hub-projects\/add$/, run: async ({ call, body }) => {
+    const path = String(((body ?? {}) as { path?: string }).path ?? '').trim();
+    if (!path) throw new Error('Pick a folder.');
+    await call('add_project', { path });
+    return hubSessions(call);
+  } },
   { method: 'POST', path: /^\/hub-sessions\/stop$/, run: async ({ call, body }) => {
     for (const id of ((body ?? {}) as { ids?: string[] }).ids ?? []) await call('stop_session', { sessionId: id });
     return hubSessions(call);

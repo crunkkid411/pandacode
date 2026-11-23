@@ -33,6 +33,9 @@ export function inboxItems(sessions: InboxSession[], bots: InboxBot[], links: Re
   const items: InboxItem[] = [];
   for (const s of sessions) {
     if (s.archived || s.draft) continue;
+    // An agent's own conversation lives in the Agents tab, not here (Jordan, 2026-11-23: "they should not
+    // appear there when I'm actively chatting with them in the Agents workspace").
+    if (bots.some(b => b.desktopSession === s.id)) continue;
     const st = rules.stateOf(s.status);
     if (st === 'working') continue;
     const at = Math.max(s.lastResponseAt ?? 0, s.updatedAt);

@@ -5,8 +5,20 @@ import { api } from '@/lib/app/api-client'
 import { fetchChat, fetchChats } from '@/lib/chat/chats'
 import { invalidateFingerprint, setIfChanged } from '../set-if-changed'
 import { createLoader, createInflightDeduplicator } from '../store-utils'
+import { safeStorageGetJson, safeStorageSet } from '@/lib/app/safe-storage'
 
 const sessionRefreshDedup = createInflightDeduplicator('sessionSlice_inflightRefreshes')
+
+// Hub: the chat Jordan last opened with each agent, so switching agents and back reopens it
+// (before, a "New chat" with an agent vanished on the way back to its first conversation).
+const AGENT_CHAT_KEY = 'hub_agent_chat'
+export function rememberedAgentChat(s: Pick<AppState, 'sessions'>, agentId: string): string | null {
+  const id = safeStorageGetJson<Record<string, string>>(AGENT_CHAT_KEY, {})[agentId]
+  return id && s.sessions[id]?.agentId === agentId ? id : null
+}
+function rememberAgentChat(agentId: string, sessionId: string) {
+  safeStorageSet(AGENT_CHAT_KEY, JSON.stringify({ ...safeStorageGetJson<Record<string, string>>(AGENT_CHAT_KEY, {}), [agentId]: sessionId }))
+}
 
 function getSessionSortScore(session: Session): number {
   return session.lastAssistantAt
@@ -73,7 +85,11 @@ export interface SessionSlice {
 export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = (set, get) => ({
   sessions: {},
   activeSessionIdOverride: null,
-  setActiveSessionIdOverride: (id) => set({ activeSessionIdOverride: id }),
+  setActiveSessionIdOverride: (id) => {
+    const agentId = get().currentAgentId
+    if (id && agentId && get().sessions[id]?.agentId === agentId) rememberAgentChat(agentId, id)
+    set({ activeSessionIdOverride: id })
+  },
   loadSessions: createLoader<AppState>(set, 'sessions', () => fetchChats()),
   refreshSession: async (id) => {
     if (!id) return

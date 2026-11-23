@@ -5,6 +5,7 @@
 import type { Agent } from '../sc/types';
 import { catalogIds, libraryNames, loadLibrary } from './bot-skills';
 import { mascotKind, mascotSeed, toolFor } from './mascots';
+import { startMode } from './mode-facts';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -53,12 +54,13 @@ function input(base: Partial<Bot>, a: Partial<Agent>) {
     : a.heartbeatIntervalSec ? Math.min(7 * 24 * 60, Math.max(1, Math.round(a.heartbeatIntervalSec / 60)))
     : a.heartbeatEnabled ? (base.heartbeatMinutes || 60) : (base.heartbeatMinutes ?? 0);
   const avatar = a.avatarUrl && isImage(a.avatarUrl) ? a.avatarUrl : a.emoji !== undefined ? (a.emoji ?? '') : (base.avatar ?? '');
+  const provider = a.provider ? pcProvider(a.provider) : base.provider ?? 'claude';
   return {
     name: (a.name ?? base.name ?? '').trim(), role: a.description ?? base.role ?? '', instructions: a.systemPrompt ?? base.instructions ?? '',
     goals: a.heartbeatGoal ?? base.goals ?? '', soul: a.soul ?? base.soul ?? '', avatar,
-    provider: a.provider ? pcProvider(a.provider) : base.provider ?? 'claude', model: a.model || base.model || 'default',
-    // ponytail: new bots start in PandaCode's own default, "ask"; change it in PandaCode's bot settings.
-    mode: base.mode ?? 'ask', heartbeatMinutes: minutes,
+    provider, model: a.model || base.model || 'default',
+    // A new bot: Claude Code starts in Auto, others in "ask". An existing bot keeps the mode he set.
+    mode: base.mode ?? startMode(provider, 'ask'), heartbeatMinutes: minutes,
     color: base.color ?? '', reasoningEffort: a.thinkingLevel ?? base.reasoningEffort ?? '',
     backupModels: base.backupModels ?? [], fallbackMode: base.fallbackMode ?? 'ask', notify: base.notify ?? true,
     whileWorking: base.whileWorking ?? 'queue', showPlan: base.showPlan ?? false,

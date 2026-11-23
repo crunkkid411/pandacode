@@ -8,8 +8,9 @@ export interface SessionRow {
   id: string; title: string; provider: string; model: string; projectId: string; projectName: string;
   agentId: string | null; agentName: string; seed: string | null; state: SessionState; at: number;
 }
-export interface ProjectRow { id: string; name: string; path: string; sessions: number; working: number; needsYou: number; failed: number; agents: { id: string; name: string; seed: string | null }[]; at: number }
-export interface PcProject { id: string; name: string; path: string }
+export interface ProjectRow { id: string; name: string; path: string; sessions: number; working: number; needsYou: number; failed: number; agents: { id: string; name: string; seed: string | null }[]; at: number; owner?: string }
+/** owner: the agent whose own folder this is (bots.rs gives every agent one). */
+export interface PcProject { id: string; name: string; path: string; owner?: string }
 
 export const SESSION_LOOK: Record<SessionState, { word: string; color: string }> = {
   working: { word: 'Working', color: '#60a5fa' },
@@ -48,7 +49,8 @@ export function projectRows(projects: PcProject[], rows: SessionRow[], bots: Inb
     for (const b of bots) if (b.projectId === p.id) agents.set(b.id, { id: b.id, name: b.name, seed: b.seed });
     for (const r of mine) if (r.agentId) agents.set(r.agentId, { id: r.agentId, name: r.agentName, seed: r.seed });
     return {
-      id: p.id, name: p.name, path: p.path, sessions: mine.length,
+      // Windows' long-path prefix (\\?\) is left off what he reads.
+      id: p.id, name: p.name, path: p.path.replace(/^\\\\\?\\/, ''), owner: p.owner, sessions: mine.length,
       working: mine.filter(r => r.state === 'working').length, needsYou: mine.filter(r => r.state === 'needs-you').length,
       failed: mine.filter(r => r.state === 'failed').length, agents: [...agents.values()], at: Math.max(0, ...mine.map(r => r.at)),
     };

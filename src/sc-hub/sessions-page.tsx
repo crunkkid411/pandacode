@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/app/api-client';
 import { AgentAvatar } from '../sc/components/agents/agent-avatar';
 import { HarnessLogo } from './harness-logo';
+import { chooseFolder } from '../bridge';
 import { SESSION_LOOK, type ProjectRow, type SessionRow, type SessionState } from './sessions-facts';
 
 interface Facts { rows: SessionRow[]; projects: ProjectRow[] }
@@ -143,11 +144,20 @@ export function HubProjects() {
   if (failed && !facts) return <p className="px-8 py-8 text-[15px] text-red-400">Could not read your projects: {failed}</p>;
   if (!facts) return null;
   const current = facts.projects.find(p => p.id === chosen) ?? facts.projects[0] ?? null;
+  const addFolder = async () => {
+    const path = await chooseFolder('Add a project folder to PandaCode');
+    if (!path) return;
+    try { setFacts(await api<Facts>('POST', '/hub-projects/add', { path })); toast.success('Project added.'); }
+    catch (e) { toast.error(`Could not add that folder: ${errorText(e)}`); }
+  };
   return (
     <div className="h-full w-full flex-1 flex flex-col px-6 py-6 gap-5 overflow-hidden">
-      <div>
-        <h1 className="font-display text-[30px] font-700 tracking-[-0.02em] text-text">Projects</h1>
-        <p className="text-[14px] text-text-2 mt-1">Your PandaCode project folders, the agents working in each, and their sessions.</p>
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="flex-1 min-w-[240px]">
+          <h1 className="font-display text-[30px] font-700 tracking-[-0.02em] text-text">Projects</h1>
+          <p className="text-[14px] text-text-2 mt-1">Your project folders and each agent's own folder, with who works in each and their chats. Pick a project for an agent in its Config tab.</p>
+        </div>
+        <button type="button" onClick={addFolder} className={`${btn} bg-[#4ade80] text-black`}>📁 Add a project folder</button>
       </div>
       <div className="flex flex-wrap gap-4 flex-1 min-h-0">
         <section aria-label="Projects" className={panel} style={{ flex: '1 1 260px', maxWidth: 340 }}>
@@ -159,8 +169,8 @@ export function HubProjects() {
                   className="w-full text-left px-4 py-3 rounded-[14px] cursor-pointer"
                   style={{ background: on ? '#2e2e36' : '#1d1d1d', border: `1px solid ${on ? '#8b8cf8' : 'rgba(255,255,255,0.08)'}` }}>
                   <div className="flex items-center gap-2">
-                    <span aria-hidden className="text-[18px]">📁</span>
-                    <span className="text-[15px] font-700 text-text truncate flex-1">{p.name}</span>
+                    <span aria-hidden className="text-[18px]">{p.owner ? '🤖' : '📁'}</span>
+                    <span className="text-[15px] font-700 text-text truncate flex-1">{p.owner ? `${p.owner}'s own folder` : p.name}</span>
                     <span className="text-[13px] text-text-2">{p.sessions}</span>
                   </div>
                   <div className="mt-1 text-[12px] text-text-3 truncate">{p.path}</div>
@@ -173,14 +183,14 @@ export function HubProjects() {
                 </button>
               );
             })}
-            {!facts.projects.length ? <p className="px-3 py-8 text-[15px] text-text-2 text-center">No project folders in PandaCode yet.</p> : null}
+            {!facts.projects.length ? <p className="px-3 py-8 text-[15px] text-text-2 text-center">No project folders yet. Use "Add a project folder" above.</p> : null}
           </div>
         </section>
         <section aria-label="Project" className={`${panel} p-4 gap-4`} style={{ flex: '3 1 480px' }}>
           {current ? (
             <>
               <div>
-                <div className="text-[20px] font-700 text-text">{current.name}</div>
+                <div className="text-[20px] font-700 text-text">{current.owner ? `${current.owner}'s own folder` : current.name}</div>
                 <div className="text-[13px] text-text-3">{current.path}</div>
               </div>
               {current.agents.length ? (

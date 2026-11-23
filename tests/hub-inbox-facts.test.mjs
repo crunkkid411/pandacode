@@ -32,13 +32,13 @@ test('read conversations leave until something new happens', () => {
   assert.equal(inboxItems(sessions, [], {}, { since: 0, seen: { a: 299 } }, rules).length, 1);
 });
 
-test('a conversation shows the agent that owns it: its thread, a task handed to it, or its folder', () => {
+test('an agent\'s own conversation stays in the Agents tab; tasks and runs it owns still come to the Inbox', () => {
   const bots = [
     { id: 'b1', name: 'Chief of Staff', seed: 'mascot|claude|#e2774a|0|clipboard', desktopSession: 't1', projectId: 'bf1' },
     { id: 'b2', name: 'Clip Finder', seed: null, desktopSession: null, projectId: 'bf2' },
   ];
   const items = inboxItems([s('t1', { updatedAt: 300 }), s('task', { updatedAt: 290 }), s('run', { projectId: 'bf2', updatedAt: 280 }), s('mine', { updatedAt: 270 })],
     bots, { task: 'b1' }, { since: 0, seen: {} }, rules);
-  assert.deepEqual(items.map(i => [i.id, i.agentId, i.agentName]), [['t1', 'b1', 'Chief of Staff'], ['task', 'b1', 'Chief of Staff'], ['run', 'b2', 'Clip Finder'], ['mine', null, 'Claude Code']]);
-  assert.equal(items[3].seed, 'mascot|claude|#000000|0|');
+  assert.deepEqual(items.map(i => [i.id, i.agentId, i.agentName]), [['task', 'b1', 'Chief of Staff'], ['run', 'b2', 'Clip Finder'], ['mine', null, 'Claude Code']]);
+  assert.equal(items[2].seed, 'mascot|claude|#000000|0|');
 });

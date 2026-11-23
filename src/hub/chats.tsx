@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Mous
 import { call } from '../bridge';
 import { CHAT_TONE, chatState, routePool, speaker, visibleChats, type ProviderModel, type RouteResult, type Chat, type ChatMessage, type ChatState, type MessagePage, type Provider } from './chats-facts';
 import type { Tone } from './facts';
+import { startMode } from '../sc-hub/mode-facts';
 
 // Chats panel: PandaCode's own chats (Claude Code, OpenCode...) with SwarmClaw's look.
 // The backend owns every fact; this panel lists, sends and stops, then reads again (JOBS.md J10).
@@ -67,7 +68,7 @@ export function Chats() {
   const live = selected.filter(id => chats.some(c => c.id === id));
   const runningSelected = live.filter(id => chatState(chats.find(c => c.id === id)!.status) === 'working');
   const newChat = (provider: string) => act(async () => {
-    const made = await call<Chat>('chat_create', { provider, model: 'default', mode: 'full' });
+    const made = await call<Chat>('chat_create', { provider, model: 'default', mode: startMode(provider, 'full') });
     setOpen(made.id);
     setSelected([made.id]);
   });
@@ -92,7 +93,7 @@ export function Chats() {
       const route = await call<RouteResult>('model_routing_route', { text, pool: routePool(lists) }).catch(() => null);
       const pick = route?.pick ?? null;
       const provider = pick?.provider ?? agents[0].id;
-      const made = await call<Chat>('chat_create', { provider, model: pick?.model ?? 'default', mode: 'full' });
+      const made = await call<Chat>('chat_create', { provider, model: pick?.model ?? 'default', mode: startMode(provider, 'full') });
       await call('send_message', { sessionId: made.id, text });
       const agent = agents.find(p => p.id === provider)?.name ?? provider;
       setPicked(pick ? `${pick.name} in ${agent}` : `${agent} (no rated model fit)`);

@@ -93,10 +93,32 @@ export function CanUse({ agent, note }: { agent: Agent; note?: string }) {
   );
 }
 
+/** The folder this agent works in: a project he picked for it, or its own folder. */
+function WorksIn({ agent }: { agent: Agent }) {
+  const [where, setWhere] = useState<{ name: string; path: string; own: boolean } | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ name: string; path: string; own: boolean }>('GET', `/agents/${encodeURIComponent(agent.id)}/folder`).then(w => { if (live) setWhere(w); }).catch(() => {});
+    return () => { live = false; };
+  }, [agent.id, agent.projectId]);
+  if (!where) return null;
+  return (
+    <section aria-label="Works in" className={card}>
+      <div className={label}>Works in</div>
+      <div className="flex items-center gap-2 text-[15px] font-700 text-text">
+        <span aria-hidden>{where.own ? '🤖' : '📁'}</span>{where.own ? 'Its own folder' : where.name}
+      </div>
+      <div className="text-[13px] text-text-2 break-all">{where.path}</div>
+      {where.own ? <p className="text-[13px] text-text-2">To have it work in one of your projects, pick a project below in this tab.</p> : null}
+    </section>
+  );
+}
+
 export function AgentProfile({ agent, session }: { agent: Agent; session: Session | null }) {
   return (
     <div className="p-4 flex flex-col gap-4">
       <RunsOn agent={agent} sessionId={session?.id ?? null} />
+      <WorksIn agent={agent} />
       {agent.description ? (
         <section aria-label="What it does" className={card}>
           <div className={label}>What it does</div>

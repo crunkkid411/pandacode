@@ -11,6 +11,10 @@ export const MODES: ModeLook[] = [
   { id: 'full', word: 'Full access', color: '#f87171', meaning: 'Does everything without asking.' },
 ];
 
-export const modeLook = (id: string): ModeLook => MODES.find(m => m.id === id) ?? MODES[0];
+/** The mode a new agent or chat starts in. Jordan, 2026-11-23: "all Claude Code agents should start with "auto" by default"
+ *  (PandaCode's "review" = Claude Code's auto mode, providers.rs). Other harnesses keep the caller's default. */
+export const startMode = (provider: string, otherwise: string): string => (provider === 'claude' ? 'review' : otherwise);
+
+export const modeLook =(id: string): ModeLook => MODES.find(m => m.id === id) ?? MODES[0];
 /** The mode after this one, wrapping around (Shift+Tab). */
 export const nextMode = (id: string): string => MODES[(MODES.findIndex(m => m.id === id) + 1) % MODES.length].id;

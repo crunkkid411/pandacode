@@ -26,6 +26,7 @@ const messages: Record<string, ChatMessage[]> = {
   c2: [{ id: 3, role: 'user', content: 'Caption the new short', createdAt: now - 70_000 }],
 };
 let nextId = 100;
+const previewProjects = [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }, { id: 'pold', name: 'Hub check (delete me)', path: 'C:/Users/x/PandaCode Bots/hub-check', addedOrder: 3 }];
 
 // Agents: PandaCode's bots and scheduled chats.
 // Agents are bots (bots.rs): b1 coordinates b2 on the Org Chart; b3 is not placed on it yet.
@@ -40,7 +41,7 @@ const rooms: MockRoom[] = [
   { id: 'r2', name: 'old-room', memberIds: ['b1'], leadBotId: null, archived: true, updatedAt: now - 9e7, activeBotIds: [], messages: [] },
 ];
 const bots: MockBot[] = [
-  { ...profile, id: 'b1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null, org: { parentId: null, swarmRole: 'coordinator', onChart: true } },
+  { ...profile, id: 'b1', projectId: 'pb1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null, org: { parentId: null, swarmRole: 'coordinator', onChart: true } },
   { ...profile, id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null, org: { parentId: 'b1', swarmRole: 'worker', onChart: true } },
   { ...profile, id: 'b3', name: 'Clip Finder', role: 'Finds clips in streams', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 0, nextHeartbeatAt: null, lastMessage: null, org: {} },
 ];
@@ -237,7 +238,12 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     return { ...item } as T;
   }
   if (command === 'capabilities_inventory') return { entries: [{ harness: 'claude', kind: 'mcp server', name: 'github', source: 'Claude Code settings' }, { harness: 'opencode', kind: 'mcp server', name: 'github', source: 'OpenCode config' }, { harness: 'claude', kind: 'plugin', name: 'superpowers@claude-plugins-official', source: '~/.claude/settings.json' }, { harness: 'claude', kind: 'plugin', name: 'ponytail@ponytail', source: '~/.claude/settings.json' }] } as T;
-  if (command === 'list_projects') return [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }, { id: 'pold', name: 'Hub check (delete me)', path: 'C:/Users/x/PandaCode Bots/hub-check', addedOrder: 3 }] as T;
+  if (command === 'list_projects') return previewProjects.map(p => ({ ...p })) as T;
+  if (command === 'add_project') {
+    const p = { id: `p${nextId++}`, name: String(args.path).split(/[\\/]/).pop() ?? 'project', path: String(args.path), addedOrder: previewProjects.length + 1 };
+    previewProjects.push(p);
+    return { ...p } as T;
+  }
   if (command === 'bot_project_ids') return ['pb1'] as T;
   if (command === 'hub_memory_list') return [
     { scope: 'Everywhere', path: 'C:/m/brand.md', name: 'hairjordan-brand', description: 'One brand file; never ask him for brand info', kind: 'reference', modified: now - 86_400_000 },

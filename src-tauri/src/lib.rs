@@ -4127,6 +4127,8 @@ pub fn run() {
                     skills::skills_import_folder,
                     capabilities::capabilities_inventory,
                     list_projects,
+                    // Projects page: "Add a project folder".
+                    add_project,
                     bots::bot_project_ids,
                     // Task Board: PandaCode's tasks, handed to agents.
                     create_board_task,
