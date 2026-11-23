@@ -536,3 +536,17 @@ test('chatrooms: his bot group chats; open one, talk to the room, every agent in
   await expect(page.getByText('b2 heard: Status check').last()).toBeVisible();
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-chatrooms.png`, fullPage: true });
 });
+
+test('activity: agent log and chats in one feed with colored words; filter by kind; a chat row opens it', async ({ page }) => {
+  await open(page, '/activity');
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
+  const feed = page.getByRole('region', { name: 'Feed' });
+  await expect(feed.getByText("I'm here, Jordan. What do you need?")).toBeVisible();
+  await expect(feed.getByText('Answered')).toBeVisible();
+  await page.getByRole('group', { name: 'Kind' }).getByRole('button', { name: /^Changed/ }).click();
+  await expect(feed.getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('group', { name: 'Kind' }).getByRole('button', { name: /^Changed/ }).click();
+  await feed.getByRole('button').first().click();
+  await expect.poll(async () => (await calls(page, 'overlay_open_task')).length).toBe(1);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-activity.png`, fullPage: true });
+});

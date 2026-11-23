@@ -238,6 +238,10 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { scope: 'X:\\AI-2', path: 'C:/m/no-telegram.md', name: 'no-telegram-no-multiple-choice', description: 'He does not use Telegram; ask in plain words', kind: 'feedback', modified: now - 3_600_000 },
     { scope: 'X:\\AI-2', path: 'C:/m/iphone.md', name: 'jordan-devices', description: 'iPhone 13 Pro', kind: 'user', modified: now - 7_200_000 },
   ] as T;
+  if (command === 'bot_activity') return (args.botId === 'b1' ? [
+    { id: 1, kind: 'reply', summary: "I'm here, Jordan. What do you need?", detail: {}, at: now - 60_000 },
+    { id: 2, kind: 'updated', summary: 'Skills and MCP servers changed', detail: {}, at: now - 7_200_000 },
+  ] : []) as T;
   if (command.startsWith('bot_shared_channel')) {
     const ch = (id: string) => { const c = rooms.find(r => r.id === id); if (!c) throw new Error('No channel'); return c; };
     if (command === 'bot_shared_channels') return rooms.map(r => ({ ...r, messages: undefined, activeBotIds: undefined })) as T;

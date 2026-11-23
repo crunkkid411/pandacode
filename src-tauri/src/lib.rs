@@ -4125,6 +4125,7 @@ pub fn run() {
                     bots::bot_assign_task,
                     bots::bot_task_links,
                     bots::bot_task_brief,
+                    bots::bot_activity,
                     // Chatrooms = bot group chats (src/sc-hub/chatrooms.ts).
                     bots::shared_channels::bot_shared_channels,
                     bots::shared_channels::bot_shared_channel_detail,

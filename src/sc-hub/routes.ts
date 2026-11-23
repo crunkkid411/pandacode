@@ -8,6 +8,7 @@ import { JOB_PREFIX, jobBoardTasks, startJob } from './jobs-md';
 import { parseInbox } from './install-list';
 import { inboxItems, type InboxItem, type InboxSession, type Seen } from './inbox-facts';
 import { projectRows, sessionRows, type PcProject } from './sessions-facts';
+import { feedRows, type BotActivity } from './activity-facts';
 import { listRooms, oneRoom, roomStream, toRoom, type SharedChannel } from './chatrooms';
 import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
@@ -467,6 +468,13 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/hub-memory$/, run: ({ call }) => call('hub_memory_list') },
   { method: 'POST', path: /^\/hub-memory\/read$/, run: ({ call, body }) => call('hub_memory_read', { path: ((body ?? {}) as { path?: string }).path ?? '' }) },
   { method: 'POST', path: /^\/hub-memory\/open$/, run: async ({ call, body }) => { await call('hub_open_path', { path: ((body ?? {}) as { path?: string }).path ?? '', folder: false }); return { ok: true }; } },
+  // Activity: every agent's log plus where each chat stands (activity-facts.ts).
+  { method: 'GET', path: /^\/hub-activity$/, run: async ({ call }) => {
+    const [{ rows }, bots] = await Promise.all([hubSessions(call), listBots(call)]);
+    const logs = await Promise.all(bots.map(b => call<BotActivity[]>('bot_activity', { botId: b.id, before: null }).catch(() => [])));
+    const people = bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null }));
+    return feedRows(people, Object.fromEntries(bots.map((b, i) => [b.id, logs[i]])), rows);
+  } },
   // Chatrooms = bot group chats (chatrooms.ts).
   { method: 'GET', path: /^\/chatrooms$/, run: async ({ call }) => listRooms(call, await botNames(call)) },
   { method: 'GET', path: /^\/chatrooms\/([^/]+)$/, run: async ({ call, match }) => oneRoom(call, match[1], await botNames(call)) },
