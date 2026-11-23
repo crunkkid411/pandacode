@@ -1,8 +1,8 @@
-// inbox.txt on the Hub's Inbox page (src/sc-hub/inbox.ts).
+// inbox.txt on the Hub's Extensions page (src/sc-hub/install-list.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { parseInbox } from '../src/sc-hub/inbox.ts';
+import { parseInbox } from '../src/sc-hub/install-list.ts';
 
 test('waiting links with notes, comments skipped, done newest first', () => {
   const inbox = parseInbox([

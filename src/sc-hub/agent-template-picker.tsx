@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { BottomSheet } from '../sc/components/shared/bottom-sheet';
 import { call } from '../bridge';
 import { AgentPickCard } from './agent-pick-card';
-import { mascotSeed, toolFor } from './mascots';
+import { mascotKind, mascotSeed, toolFor } from './mascots';
 
 export interface Template { path: string; name: string; description: string; source: string; provider: string; model?: string; role?: string }
 export interface TemplateText { name: string; description: string; prompt: string; provider: string; model?: string; role?: string }
@@ -70,7 +70,7 @@ export function AgentTemplatePicker({ open, onClose, onPick }: Props) {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 overflow-y-auto max-h-[55vh] pr-1">
         {shown.slice(0, 200).map(t => {
           // A template's face: the mascot of the harness it will run on (Claude Code when it names none).
-          const harness = t.provider || 'claude';
+          const harness = mascotKind(t.provider || 'claude', t.model ?? '');
           return (
             <AgentPickCard key={t.path} name={t.name} description={t.description} provider={harness} title={t.path}
               seed={mascotSeed(harness, t.path, '', null, toolFor(`${t.name} ${t.description}`, t.role === 'coordinator'))}

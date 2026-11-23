@@ -4,7 +4,7 @@
 // to the bot commands in src-tauri/src/bots.rs. Fields bots do not have are not saved.
 import type { Agent } from '../sc/types';
 import { catalogIds, libraryNames, loadLibrary } from './bot-skills';
-import { mascotSeed, toolFor } from './mascots';
+import { mascotKind, mascotSeed, toolFor } from './mascots';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -34,7 +34,7 @@ export function botAgent(b: Bot): Agent {
     emoji: b.avatar && !isImage(b.avatar) && !b.avatar.startsWith('panda:') ? b.avatar : undefined,
     avatarUrl: isImage(b.avatar) ? b.avatar : null,
     // Its face: the harness mascot in the bot's own color, its chosen panda face, a tool for its role (mascots.ts).
-    avatarSeed: mascotSeed(b.provider, b.id, b.color ?? '', /^panda:(\d+)$/.test(b.avatar) ? Number(b.avatar.slice(6)) : null,
+    avatarSeed: mascotSeed(mascotKind(b.provider, b.model), b.id, b.color ?? '', /^panda:(\d+)$/.test(b.avatar) ? Number(b.avatar.slice(6)) : null,
       toolFor(`${b.name} ${b.role}`, org.swarmRole === 'coordinator')),
     role: org.swarmRole === 'coordinator' ? 'coordinator' : 'worker',
     orgChart: org.onChart ? { parentId: org.parentId ?? null, teamLabel: org.teamLabel ?? null, teamColor: org.teamColor ?? null, x: org.x ?? null, y: org.y ?? null } : null,

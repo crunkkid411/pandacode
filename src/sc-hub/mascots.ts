@@ -1,7 +1,9 @@
-// Agent faces: a little blob creature per agent (murmur / invisible_dots / Rakazo style, drawn as SVG).
-// Its body is its harness's brand color with the harness mark on its forehead (Claude Code = orange with
-// Claude's starburst), its face style and shade make each agent its own, and it holds a tool when its
-// role clearly calls for one. A bot's own color (PandaCode's bot settings) replaces the brand color.
+// Agent faces: a little creature per agent (murmur / invisible_dots / Rakazo style, drawn as SVG).
+// Claude Code agents are Clawd, Claude Code's own pixel mascot (Jordan, 2026-11-23: "Claw'd the mascot,
+// not the company logo"). Other harnesses are a soft blob in their logo's outline and brand color;
+// logos with a hole (OpenRouter's "O", Liquid AI's drop) show the face in that hole. Face style and shade
+// make each agent its own, and it holds a tool when its role clearly calls for one. A bot's own color
+// (PandaCode's bot settings) replaces the brand color.
 //
 // AgentAvatar draws any seed that starts with "mascot|" (see mascotSeed); bots get one in bot-agents.ts.
 
@@ -12,7 +14,10 @@ const LIGHT = '#fffaf5';
 
 /** Brand colors and marks. Change a color here and every agent of that harness follows. */
 export const HARNESSES: Record<string, Harness> = {
-  claude: { name: 'Claude Code', color: '#d97757', mark: 'starburst' },
+  claude: { name: 'Claude Code', color: '#e2774a', mark: 'clawd' },
+  // Colors and shapes checked on the companies' own sites, 2026-11-23.
+  openrouter: { name: 'OpenRouter', color: '#c8ff00', mark: 'ring' },
+  liquid: { name: 'Liquid AI', color: '#7b3aed', mark: 'drop' },
   codex: { name: 'Codex', color: '#eceef2', mark: 'knot' },
   gemini: { name: 'Gemini CLI', color: '#6f86f6', mark: 'sparkle' },
   qwen: { name: 'Qwen Code', color: '#7b5cff', mark: 'hexagon' },
@@ -64,23 +69,66 @@ export function agentColor(harness: string, id: string, own = ''): string {
   return shade(base, ((hash(id) % 13) - 4) / 100); // ponytail: -4%..+8% so two Claude agents differ a little but stay on-brand
 }
 
+/** Whose face an agent wears: its model's company when that has one (Liquid's LFM models, anything
+ *  through OpenRouter), else its harness. */
+export function mascotKind(provider: string, model = ''): string {
+  if (provider === 'openrouter' || /^openrouter[/:]/i.test(model)) return 'openrouter';
+  if (/\b(lfm|liquid)/i.test(model)) return 'liquid';
+  return provider;
+}
+
 /** "mascot|harness|#color|face|tool" — what AgentAvatar's seed carries. */
 export function mascotSeed(harness: string, id: string, ownColor: string, face: number | null, tool: string): string {
   const f = face ?? hash(id) % FACES.length;
   return ['mascot', harness, agentColor(harness, id, ownColor), String(f % FACES.length), tool].join('|');
 }
 
-const eye = (x: number) => `<ellipse cx="${x}" cy="29" rx="3" ry="4.3" fill="${INK}"/><circle cx="${x + 1}" cy="27.4" r="1.1" fill="#fff"/>`;
-const arc = (x: number) => `<path d="M${x - 3.2} 30q3.2-4 6.4 0" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
-function face(index: number): string {
+function face(index: number, ink = INK): string {
+  const eye = (x: number) => `<ellipse cx="${x}" cy="29" rx="3" ry="4.3" fill="${ink}"/><circle cx="${x + 1}" cy="27.4" r="1.1" fill="${ink === INK ? '#fff' : INK}"/>`;
+  const arc = (x: number) => `<path d="M${x - 3.2} 30q3.2-4 6.4 0" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`;
   switch (FACES[index]) {
     case 'Happy': return arc(25) + arc(39);
     case 'Wink': return eye(25) + arc(39);
-    case 'Sleepy': return `<path d="M21.8 28h6.4a3.2 3.2 0 0 1-6.4 0zM35.8 28h6.4a3.2 3.2 0 0 1-6.4 0z" fill="${INK}"/>`;
-    case 'Glasses': return eye(25) + eye(39) + `<g fill="none" stroke="${INK}" stroke-width="1.6"><circle cx="25" cy="29" r="5.6"/><circle cx="39" cy="29" r="5.6"/><path d="M30.6 28.6h2.8"/></g>`;
-    case 'Grumpy': return eye(25) + eye(39) + `<path d="M20.5 21.8l7.5 2.4M43.5 21.8l-7.5 2.4" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
+    case 'Sleepy': return `<path d="M21.8 28h6.4a3.2 3.2 0 0 1-6.4 0zM35.8 28h6.4a3.2 3.2 0 0 1-6.4 0z" fill="${ink}"/>`;
+    case 'Glasses': return eye(25) + eye(39) + `<g fill="none" stroke="${ink}" stroke-width="1.6"><circle cx="25" cy="29" r="5.6"/><circle cx="39" cy="29" r="5.6"/><path d="M30.6 28.6h2.8"/></g>`;
+    case 'Grumpy': return eye(25) + eye(39) + `<path d="M20.5 21.8l7.5 2.4M43.5 21.8l-7.5 2.4" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`;
     default: return eye(25) + eye(39);
   }
+}
+
+/** Clawd's pixel eyes, one per face (from Jordan's photos: bars, ^ ^, wink, sleepy, pixel shades, > <). */
+function clawdFace(index: number): string {
+  const px = (cells: [number, number][], x0: number, y0 = 20) => cells.map(([x, y]) => `<rect x="${x0 + x * 3}" y="${y0 + y * 3}" width="3" height="3"/>`).join('');
+  const bar = (x: number) => `<rect x="${x}" y="20" width="4.5" height="10"/>`;
+  const up: [number, number][] = [[0, 2], [1, 1], [2, 0], [3, 1], [4, 2]];
+  const flat = (x: number) => `<rect x="${x}" y="25" width="9" height="3"/>`;
+  const right: [number, number][] = [[0, 0], [1, 1], [2, 2], [1, 3], [0, 4]]; // ">"
+  const left: [number, number][] = [[2, 0], [1, 1], [0, 2], [1, 3], [2, 4]]; // "<"
+  switch (FACES[index]) {
+    case 'Happy': return px(up, 15, 22) + px(up, 34, 22);
+    case 'Wink': return bar(21) + flat(35.5);
+    case 'Sleepy': return flat(18) + flat(37);
+    case 'Glasses': // "deal with it" shades: a black band with white pixel glints
+      return `<rect x="15" y="21" width="34" height="3"/><rect x="17" y="24" width="12" height="3"/><rect x="19" y="27" width="8" height="2"/>`
+        + `<rect x="35" y="24" width="12" height="3"/><rect x="37" y="27" width="8" height="2"/>`
+        + `<g fill="#fff"><rect x="20" y="24" width="2" height="2"/><rect x="22" y="26" width="2" height="2"/><rect x="38" y="24" width="2" height="2"/><rect x="40" y="26" width="2" height="2"/></g>`;
+    case 'Grumpy': return px(right, 19) + px(left, 36);
+    default: return bar(20.5) + bar(39);
+  }
+}
+
+/** Clawd: a flat orange block with arm nubs and four short legs, drawn pixel-crisp. */
+function clawd(color: string, faceNo: number, held: string): string {
+  const side = shade(color, -0.16), top = shade(color, 0.14), legs = shade(color, -0.08);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">`
+    + `<g fill="${legs}"><rect x="15" y="43" width="4" height="12"/><rect x="21" y="43" width="4" height="12"/><rect x="39" y="43" width="4" height="12"/><rect x="45" y="43" width="4" height="12"/></g>`
+    + `<rect x="5" y="27" width="8" height="8" fill="${side}"/><rect x="51" y="27" width="8" height="8" fill="${side}"/>`
+    + `<rect x="11" y="13" width="42" height="32" fill="${color}"/>`
+    + `<rect x="11" y="13" width="42" height="3" fill="${top}"/><rect x="50" y="16" width="3" height="29" fill="${side}" opacity=".55"/>`
+    + `<g fill="${INK}">${clawdFace(faceNo)}</g>`
+    // A held tool sits a little higher: Clawd's body ends where his legs start.
+    + (held ? `<g shape-rendering="auto" transform="translate(0 -5)">${tool(held)}</g>` : '')
+    + `</svg>`;
 }
 
 function mark(kind: string, ink: string): string {
@@ -126,9 +174,22 @@ const ring = (n: number, outer: number, inner: number, turn = 0) =>
 const poly = (n: number, r: number, turn = 0) =>
   `M${Array.from({ length: n }, (_, i) => xy(r, (2 * Math.PI * i) / n + turn - Math.PI / 2)).join('L')}z`;
 
-/** Each body follows its logo's outline; a thick round edge ("round") keeps it a soft blob. Others: the plain blob. */
-const SHAPES: Record<string, { d: string; round: number }> = {
-  claude: { d: ring(12, 24.5, 17.5), round: 8 }, // Claude's starburst
+/** Each body follows its logo's outline; a thick round edge ("round") keeps it a soft blob. Others: the plain blob.
+ *  `at` places a logo drawn in its own units; `hole` is the logo's hole (cx, cy, r in the 64 box), where the face goes. */
+interface Shape { d: string; round: number; at?: string; hole?: [number, number, number] }
+const SHAPES: Record<string, Shape> = {
+  // OpenRouter's mark (outer outline, from openrouter.ai's header): an "O" with an "R" leg.
+  openrouter: {
+    d: 'M303.9475,17.19926c42.79734,0,77.48933,34.69327,77.48933,77.48933s-34.69199,77.48933-77.48933,77.48933l76.86166,76.86244c9.76367,9.76313,2.84903,26.45667-10.95697,26.45667h-220.88335c-71.32686,0-129.14889-57.82202-129.14889-129.14889S77.64197,17.19926,148.96884,17.19926h154.97866Z',
+    round: 0, at: 'translate(5 12) scale(.147) translate(-19.82 -17.2)', hole: [24, 31, 11.4],
+  },
+  // Liquid AI's mark (liquid.ai/logos): three pieces round a drop-shaped hole.
+  liquid: {
+    d: 'M386.801 319.037L386.474 319.22L503.32 515.258C518.989 538.504 528.132 566.18 528.132 595.93C528.132 624.104 519.97 650.452 505.782 672.918L743.865 598.585L371.425 0L281.732 144.536L386.801 319.037Z'
+      + 'M186.582 895.985L373.628 744.663C373.473 744.663 373.301 744.663 373.146 744.663C287.552 744.663 218.178 678.078 218.178 595.946C218.178 566.279 227.27 538.669 242.87 515.457L353.396 329.673L261.535 177.106L0 598.601L186.272 895.985H186.582Z'
+      + 'M452.697 723.591C452.697 723.591 452.68 723.591 452.662 723.607L239.977 895.985H555.596L715.557 643.301L452.697 723.607V723.591Z',
+    round: 0, at: 'translate(10.4 4) scale(.0583)', hole: [32.1, 38.7, 8.6],
+  },
   codex: { d: ring(6, 23.5, 15, Math.PI / 6), round: 11 }, // OpenAI's six-lobed knot
   gemini: { d: ring(4, 26, 12), round: 9 }, // Gemini's four-point sparkle
   qwen: { d: poly(6, 24, Math.PI / 6), round: 9 }, // Qwen's hexagon
@@ -146,32 +207,41 @@ export function mascotSvg(seed: string): string {
   const [kind, harness, color, faceIndex, held] = seed.split('|');
   if (kind !== 'mascot' || !/^#[0-9a-f]{6}$/i.test(color ?? '')) return '';
   const h = HARNESSES[harness];
+  if (harness === 'claude') return clawd(color, Number(faceIndex) || 0, tool(held ?? '') ? held : '');
   const dark = luma(color) < 110;
   const ink = dark ? LIGHT : (h?.mark === 'knot' || h?.mark === 'brackets' ? INK : LIGHT);
   const markKind = h?.mark === 'goggles' || shapeIsMark(harness) ? '' : h?.mark ?? '';
-  const s = SHAPES[harness] ?? { d: BODY, round: 0 };
-  const body = (fill: string) => `<path d="${s.d}" fill="${fill}"${s.round ? ` stroke="${fill}" stroke-width="${s.round}" stroke-linejoin="round"` : ''}/>`;
+  const s: Shape = SHAPES[harness] ?? { d: BODY, round: 0 };
+  const body = (fill: string) => `<path d="${s.d}" fill="${fill}"${s.at ? ` transform="${s.at}"` : ''}${s.round ? ` stroke="${fill}" stroke-width="${s.round}" stroke-linejoin="round"` : ''}/>`;
   // Cursor's cube: a lighter top face and the edges, faintly.
   const cube = harness === 'cursor'
     ? `<path d="M32 6L53.7 18.5L32 31L10.3 18.5z" fill="${shade(color, 0.16)}" stroke="${shade(color, 0.16)}" stroke-width="5" stroke-linejoin="round" opacity=".7"/><path d="M32 31V56M32 31L53.7 18.5M32 31L10.3 18.5" stroke="${shade(color, 0.3)}" stroke-width="1.4" opacity=".5"/>`
     : '';
   const faceNo = h?.mark === 'goggles' ? FACES.indexOf('Glasses') : Number(faceIndex) || 0;
-  const t = tool(held ?? '');
-  const hands = t ? `<circle cx="19.6" cy="47" r="3.8" fill="${shade(color, -0.12)}"/><circle cx="44.4" cy="47" r="3.8" fill="${shade(color, -0.12)}"/>` : '';
+  const hole = s.hole;
+  // In a hole logo the face sits in the hole, light on dark, and a held tool moves aside so the face shows.
+  const shownFace = hole
+    ? `<circle cx="${hole[0]}" cy="${hole[1]}" r="${hole[2]}" fill="${INK}"/><circle cx="${hole[0]}" cy="${hole[1]}" r="${hole[2] - 0.6}" fill="none" stroke="${shade(color, -0.3)}" stroke-width="1.2"/>`
+      + `<g transform="translate(${hole[0]} ${hole[1] - 0.6}) scale(${(hole[2] / 17.5).toFixed(3)}) translate(-32 -29)">${face(faceNo, LIGHT)}</g>`
+    : face(faceNo);
+  const toolAt = harness === 'openrouter' ? 'translate(45 41) scale(.78) translate(-32 -46)' : harness === 'liquid' ? 'translate(46 49) scale(.62) translate(-32 -46)' : '';
+  const t = tool(held ?? '') && toolAt ? `<g transform="${toolAt}">${tool(held ?? '')}</g>` : tool(held ?? '');
+  const hands = t && !hole ? `<circle cx="19.6" cy="47" r="3.8" fill="${shade(color, -0.12)}"/><circle cx="44.4" cy="47" r="3.8" fill="${shade(color, -0.12)}"/>` : '';
+  const feetY = harness === 'openrouter' ? 50.5 : 56.6;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`
     + `<defs><radialGradient id="hi" cx="34%" cy="24%" r="72%"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>`
     + `<linearGradient id="lo" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-opacity="0"/><stop offset="1" stop-opacity=".28"/></linearGradient></defs>`
-    + `<ellipse cx="23" cy="56.6" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/><ellipse cx="41" cy="56.6" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/>`
+    + `<ellipse cx="23" cy="${feetY}" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/><ellipse cx="41" cy="${feetY}" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/>`
     // A dark body gets a faint light rim so it shows on the dark window.
-    + (luma(color) < 70 ? `<path d="${s.d}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="${s.round + 2.4}" stroke-linejoin="round"/>` : '')
+    + (luma(color) < 70 && !s.at ? `<path d="${s.d}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="${s.round + 2.4}" stroke-linejoin="round"/>` : '')
     // Light and shade are painted through a mask of the body, so the round edge and the fill never double up.
     + `<mask id="m">${body('#fff')}</mask>`
     + body(color) + `<rect width="64" height="64" fill="url(#hi)" mask="url(#m)"/><rect width="64" height="64" fill="url(#lo)" mask="url(#m)"/>` + cube
     + mark(markKind, ink)
     // Dark bodies get eye whites, or the eyes vanish.
-    + (luma(color) < 80 ? `<ellipse cx="25" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/><ellipse cx="39" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/>` : '')
-    + face(faceNo)
-    + `<ellipse cx="19.5" cy="35.5" rx="2.6" ry="1.6" fill="#ff6f8e" opacity=".35"/><ellipse cx="44.5" cy="35.5" rx="2.6" ry="1.6" fill="#ff6f8e" opacity=".35"/>`
+    + (luma(color) < 80 && !hole ? `<ellipse cx="25" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/><ellipse cx="39" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/>` : '')
+    + shownFace
+    + (hole ? '' : `<ellipse cx="19.5" cy="35.5" rx="2.6" ry="1.6" fill="#ff6f8e" opacity=".35"/><ellipse cx="44.5" cy="35.5" rx="2.6" ry="1.6" fill="#ff6f8e" opacity=".35"/>`)
     + t + hands
     + `</svg>`;
 }

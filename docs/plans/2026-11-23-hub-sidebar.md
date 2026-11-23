@@ -24,7 +24,9 @@ B. Look
 
 C. Pages (each with real data)
 - [x] Task Board <- JOBS.md (read only; Start turns a job into a PandaCode task)
-- [x] Inbox <- inbox.txt (add link, open link, Install them now). Agent notifications: not yet
+- [x] Inbox = SwarmClaw's idea, for Jordan: agents waiting on him, failures, replies he hasn't read (Ctrl/Shift select, Mark read, Open chat). Jordan, 2026-11-23: "inbox.txt is not the same functionality as swarmclaws inbox ... use swarmclaws idea of inbox - the gui is for me, the user"
+- [x] Extensions <- inbox.txt (add link, open link, Install them now); moved out of Inbox
+- [x] Mascots: Claude Code = Clawd ("Claw'd the mascot, not the company logo"); OpenRouter and Liquid AI added, picked by the model
 - [ ] Projects, Sessions/Runs, Memory, Activity
 - [ ] MCP servers, Extensions (plugins), Connectors, Webhooks
 - [ ] Chatrooms, Knowledge (qmd), Missions, Quality, Feed

@@ -69,7 +69,7 @@ const schedules: HubSchedule[] = [
 function invokeChats(command: string, args: Record<string, any>): unknown {
   const w = window as any;
   switch (command) {
-    case 'list_sessions': return chats.map(c => ({ ...c }));
+    case 'list_sessions': return [...chats, ...(w.__hubWaitingChat ? [{ id: 'c9', title: 'Pick a thumbnail', provider: 'claude', model: 'default', status: 'waiting', archived: false, createdAt: now - 5e6, updatedAt: now - 120_000, lastResponseAt: now - 120_000 }] : [])].map(c => ({ ...c }));
     case 'list_providers': if (w.__hubSlowProviders && !w.__hubSlowDone) { w.__hubSlowDone = true; return new Promise(r => setTimeout(() => r(invokeHub('list_providers', args)), 800)); }
       return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'gemini', name: 'Gemini CLI', installed: true }, { id: 'qwen', name: 'Qwen Code', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }, ...((window as any).__hubBroken ? [{ id: 'cursor-broken', name: 'Broken Agent', installed: true }] : [])];
     case 'get_messages': return { messages: (messages[args.sessionId] ?? []).map(m => ({ ...m })), hasOlder: false };
@@ -177,6 +177,13 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   ] as T;
   if (command === 'hub_speak') return new ArrayBuffer(0) as T;
   if (command === 'hub_inbox_add' || command === 'hub_inbox_install' || command === 'hub_open_link') return null as T;
+  // Inbox read state: everything counts as new in the preview until marked read.
+  if (command === 'hub_inbox_seen' || command === 'hub_inbox_mark_read') {
+    const w = window as any;
+    w.__hubSeen ??= { since: 0, seen: {} };
+    for (const id of (args.ids ?? []) as string[]) w.__hubSeen.seen[id] = Date.now() + 1;
+    return { since: w.__hubSeen.since, seen: { ...w.__hubSeen.seen } } as T;
+  }
   if (command === 'hub_read_list') return (args.name === 'jobs' ? [
     '## Index, in build order', '', '| Job | Label | One sentence |', '|---|---|---|',
     '| J02 | DONE (2026-11-09) | Fix the Planner crash. |', '| J06 | READY | Check Vibe\'s graph. |',

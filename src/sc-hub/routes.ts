@@ -5,7 +5,9 @@ import { loadLibrary } from './bot-skills';
 import { isChatProject } from '../chats';
 import { boardTasks, createBoardTask, settleDone, updateBoardTask } from './board-tasks';
 import { JOB_PREFIX, jobBoardTasks, startJob } from './jobs-md';
-import { parseInbox } from './inbox';
+import { parseInbox } from './install-list';
+import { inboxItems, type InboxItem, type InboxSession, type Seen } from './inbox-facts';
+import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
 import { chatCommands, forwardMentions, slashParts } from './chat-commands';
 
@@ -260,6 +262,18 @@ function saved(): Saved {
 function save(next: Saved) { try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* the choice just won't stick */ } }
 const BASE_SETTINGS = { userName: 'Jordan', setupCompleted: true };
 
+/** The Inbox: conversations agents left for Jordan (inbox-facts.ts), with each agent's face. */
+async function hubInbox(call: Call): Promise<InboxItem[]> {
+  const [sessions, bots, links, seen] = await Promise.all([
+    call<InboxSession[]>('list_sessions'), listBots(call), call<Record<string, string>>('bot_task_links'), call<Seen>('hub_inbox_seen'),
+  ]);
+  return inboxItems(sessions, bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null, desktopSession: b.desktopSession, projectId: b.projectId })), links, seen, {
+    stateOf: chatState,
+    seedFor: s => mascotSeed(mascotKind(s.provider, s.model), s.provider, '', 0, ''),
+    nameFor: p => HARNESSES[p]?.name ?? p,
+  });
+}
+
 /** A board card is a PandaCode task, or a JOBS.md job (which can only be handed to an agent). */
 const updateAnyTask = (call: Call, id: string, patch: Partial<BoardTask>) =>
   id.startsWith(JOB_PREFIX) ? startJob(call, id, patch, createBoardTask) : updateBoardTask(call, id, patch);
@@ -409,15 +423,23 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/providers\/configs$/, run: async () => [] },
   { method: 'GET', path: /^\/usage$/, run: ({ call, query }) => usage(call, query.get('range') ?? '7d') },
   { method: 'GET', path: /^\/tasks\/metrics$/, run: async () => null },
-  // Inbox: Jordan's inbox.txt (inbox.ts).
-  { method: 'GET', path: /^\/hub-inbox$/, run: async ({ call }) => parseInbox(await call<string>('hub_read_list', { name: 'inbox' })) },
-  { method: 'POST', path: /^\/hub-inbox$/, run: async ({ call, body }) => {
+  // Extensions: Jordan's install list, inbox.txt (install-list.ts).
+  { method: 'GET', path: /^\/hub-installs$/, run: async ({ call }) => parseInbox(await call<string>('hub_read_list', { name: 'inbox' })) },
+  { method: 'POST', path: /^\/hub-installs$/, run: async ({ call, body }) => {
     const { link = '', note = '' } = (body ?? {}) as { link?: string; note?: string };
     await call('hub_inbox_add', { link, note });
     return parseInbox(await call<string>('hub_read_list', { name: 'inbox' }));
   } },
-  { method: 'POST', path: /^\/hub-inbox\/install$/, run: async ({ call }) => { await call('hub_inbox_install'); return { ok: true }; } },
-  { method: 'POST', path: /^\/hub-inbox\/open$/, run: async ({ call, body }) => { await call('hub_open_link', { url: (body as { url?: string })?.url ?? '' }); return { ok: true }; } },
+  { method: 'POST', path: /^\/hub-installs\/install$/, run: async ({ call }) => { await call('hub_inbox_install'); return { ok: true }; } },
+  { method: 'POST', path: /^\/hub-installs\/open$/, run: async ({ call, body }) => { await call('hub_open_link', { url: (body as { url?: string })?.url ?? '' }); return { ok: true }; } },
+  // Inbox: agent replies Jordan hasn't read, agents waiting on him, failures (inbox-facts.ts).
+  { method: 'GET', path: /^\/hub-inbox$/, run: ({ call }) => hubInbox(call) },
+  { method: 'POST', path: /^\/hub-inbox\/read$/, run: async ({ call, body }) => {
+    await call('hub_inbox_mark_read', { ids: ((body ?? {}) as { ids?: string[] }).ids ?? [] });
+    return hubInbox(call);
+  } },
+  { method: 'GET', path: /^\/hub-inbox\/([^/]+)\/messages$/, run: async ({ call, match }) =>
+    (await call<{ messages: PcMessage[] }>('get_messages', { sessionId: decodeURIComponent(match[1]) })).messages.slice(-30) },
   // Task Board: PandaCode's tasks (board-tasks.ts) and Jordan's JOBS.md jobs (jobs-md.ts).
   { method: 'GET', path: /^\/tasks$/, run: async ({ call, query }) => {
     const all = query.get('includeArchived') === 'true';

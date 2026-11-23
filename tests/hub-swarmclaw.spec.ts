@@ -179,7 +179,7 @@ test('look: Agents shows every agent as a card with its harness mascot and logo;
   await expect(card).toBeVisible();
   // Claude Code agents are orange (the mascot carries the color), OpenCode ones are slate.
   const faces = await page.getByRole('group', { name: 'All agents' }).locator('img[src^="data:image/svg+xml"]').evaluateAll(imgs => imgs.map(i => decodeURIComponent((i as HTMLImageElement).src)));
-  expect(faces.some(f => /fill="#[cd][0-9a-f]7[0-9a-f]{3}"/.test(f) && f.includes('d="M32.0 6.5L'))).toBe(true); // orange starburst body (Claude's logo)
+  expect(faces.some(f => f.includes('shape-rendering="crispEdges"') && f.includes('width="42" height="32"'))).toBe(true); // Clawd, Claude Code's pixel mascot
   await card.click();
   await expect(page).toHaveURL(/#\/agents\/b1$/);
 });
@@ -335,9 +335,35 @@ test('agents: any installed harness; skills, slash commands, MCP servers and a w
   await expect.poll(async () => (await calls(page, 'bot_set_work_project')).map(c => c.args.projectId)).toEqual(['p1']);
 });
 
-test('inbox: inbox.txt links waiting and installed; add a link, open one, install them now', async ({ page }) => {
+test('inbox: what agents left for Jordan; waiting first, read one, Ctrl/Shift select, mark the selection read', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubWaitingChat = true; });
   await open(page, '/inbox');
   await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
+  const list = page.getByRole('region', { name: 'Conversations' });
+  const rows = list.getByRole('listitem');
+  // Waiting on him comes first; a running chat is not in the Inbox. Status = color AND a word.
+  await expect(rows).toHaveText([/Pick a thumbnail.*Waiting for you/, /Fix the playlist scout.*New reply/]);
+  await expect(page.getByRole('region', { name: 'Agents' }).getByRole('button', { name: /Everything/ })).toContainText('2');
+
+  await rows.filter({ hasText: 'Fix the playlist scout' }).getByRole('button').click();
+  const convo = page.getByRole('region', { name: 'Conversation' });
+  await expect(convo.getByText('It ran Qwen3.5-4B on the graphics card.')).toBeVisible();
+  await expect(convo.getByRole('button', { name: 'Open chat' })).toBeVisible();
+
+  await rows.filter({ hasText: 'Pick a thumbnail' }).getByRole('button').click({ modifiers: ['Shift'] });
+  await expect(list.locator('[aria-selected="true"]')).toHaveCount(2);
+  await rows.filter({ hasText: 'Pick a thumbnail' }).getByRole('button').click({ modifiers: ['Control'] });
+  await expect(list.locator('[aria-selected="true"]')).toHaveCount(1);
+  await rows.filter({ hasText: 'Pick a thumbnail' }).getByRole('button').click({ modifiers: ['Control'] });
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-inbox.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Mark read (2)' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_inbox_mark_read')).map(c => [...c.args.ids].sort())).toEqual([['c1', 'c9']]);
+  await expect(page.getByText("Nothing new. You're all caught up.")).toBeVisible();
+});
+
+test('extensions: inbox.txt links waiting and installed; add a link, open one, install them now', async ({ page }) => {
+  await open(page, '/extensions');
+  await expect(page.getByRole('heading', { name: 'Extensions', exact: true })).toBeVisible();
   const waiting = page.getByRole('region', { name: 'Waiting' });
   await expect(waiting.getByRole('button', { name: 'github.com/JuneYaooo/rea-video' })).toBeVisible();
   await expect(waiting.getByRole('listitem')).toHaveCount(2);
@@ -354,7 +380,7 @@ test('inbox: inbox.txt links waiting and installed; add a link, open one, instal
   await expect.poll(async () => (await calls(page, 'hub_open_link')).map(c => c.args.url)).toEqual(['https://github.com/noblehacks/frenemy']);
   await page.getByRole('button', { name: 'Install them now' }).click();
   await expect.poll(async () => (await calls(page, 'hub_inbox_install')).length).toBe(1);
-  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-inbox.png`, fullPage: true });
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-extensions.png`, fullPage: true });
 });
 
 test('task board: JOBS.md jobs are cards; a ready job starts as a real task, a decision job never starts', async ({ page }) => {
