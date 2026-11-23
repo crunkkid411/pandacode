@@ -550,3 +550,27 @@ test('activity: agent log and chats in one feed with colored words; filter by ki
   await expect.poll(async () => (await calls(page, 'overlay_open_task')).length).toBe(1);
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-activity.png`, fullPage: true });
 });
+
+test('connectors: each agent card shows its connections by platform color + state word; switch off, remove (asks once), connect a new one', async ({ page }) => {
+  await open(page, '/connectors');
+  await expect(page.getByRole('heading', { name: 'Connectors', exact: true })).toBeVisible();
+  const chief = page.getByRole('article', { name: 'Chief of Staff' });
+  await expect(chief.getByText('Connected', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Inbox Sorter' }).getByText('Not connected anywhere yet.')).toBeVisible();
+  await chief.getByRole('button', { name: 'Switch off' }).click();
+  await expect(chief.getByText('Off', { exact: true })).toBeVisible();
+  await chief.getByRole('button', { name: 'Remove' }).click();
+  await expect(chief.getByRole('button', { name: 'Click again to remove' })).toBeVisible();
+  expect(await calls(page, 'bot_channel_remove')).toHaveLength(0);
+  await chief.getByRole('button', { name: 'Click again to remove' }).click();
+  await expect(chief.getByText('Not connected anywhere yet.')).toBeVisible();
+  const form = page.getByRole('form', { name: 'Connect an agent' });
+  await form.getByRole('group', { name: 'Platform' }).getByRole('button', { name: /Telegram/ }).click();
+  await form.getByLabel('Bot token from BotFather').fill('bad');
+  await form.getByRole('button', { name: 'Connect to Telegram' }).click();
+  await expect(page.getByText("That doesn't look like a Telegram bot token.")).toBeVisible();
+  await form.getByRole('group', { name: 'Platform' }).getByRole('button', { name: /Web chat/ }).click();
+  await form.getByRole('button', { name: 'Connect to Web chat' }).click();
+  await expect(chief.getByRole('button', { name: 'Copy the link' })).toBeVisible();
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-connectors.png`, fullPage: true });
+});

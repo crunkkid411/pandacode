@@ -4126,6 +4126,11 @@ pub fn run() {
                     bots::bot_task_links,
                     bots::bot_task_brief,
                     bots::bot_activity,
+                    // Connectors (src/sc-hub/connectors-page.tsx).
+                    bots::channels::bot_channel_add,
+                    bots::channels::bot_channel_set_enabled,
+                    bots::channels::bot_channel_remove,
+                    bots::channels::bot_web_link,
                     // Chatrooms = bot group chats (src/sc-hub/chatrooms.ts).
                     bots::shared_channels::bot_shared_channels,
                     bots::shared_channels::bot_shared_channel_detail,

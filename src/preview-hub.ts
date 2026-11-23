@@ -31,6 +31,7 @@ let nextId = 100;
 // Agents are bots (bots.rs): b1 coordinates b2 on the Org Chart; b3 is not placed on it yet.
 type MockBot = HubBot & Record<string, any>;
 const profile = { instructions: '', goals: '', soul: '', avatar: '', mode: 'ask', color: '', reasoningEffort: '', backupModels: [], fallbackMode: 'ask', notify: true, whileWorking: 'queue', showPlan: false, skills: [], mcp: [], createdAt: now - 9e6, updatedAt: now - 9e6, desktopSession: null };
+const links = [{ id: 'l1', botId: 'b1', kind: 'telegram', label: 'Telegram', enabled: true, status: 'Connected as @hj_bot', secrets: ['token'] }];
 interface MockRoom { id: string; name: string; memberIds: string[]; leadBotId: null; archived: boolean; updatedAt: number; activeBotIds: string[];
   messages: { id: string; kind: string; authorBotId: string | null; text: string; status: string | null; createdAt: number }[] }
 const rooms: MockRoom[] = [
@@ -53,7 +54,7 @@ const botSchedules: any[] = [
 function invokeBotSchedules(command: string, args: Record<string, any>): unknown {
   const own = () => { const s = botSchedules.find(x => x.id === args.scheduleId); if (!s) throw new Error('This schedule no longer exists.'); return s; };
   switch (command) {
-    case 'bot_detail': return { bot: { ...botById(args.botId) }, schedules: botSchedules.filter(s => s.botId === args.botId).map(s => ({ ...s })), memories: [], channels: [], pairings: [], threads: [], rules: [], serverPort: 0 };
+    case 'bot_detail': return { bot: { ...botById(args.botId) }, schedules: botSchedules.filter(s => s.botId === args.botId).map(s => ({ ...s })), memories: [], channels: links.filter(c => c.botId === args.botId).map(c => ({ ...c })), pairings: [], threads: [], rules: [], serverPort: 0 };
     case 'bot_schedule_create': {
       const i = args.input;
       if (!i.prompt) throw new Error('A schedule needs a prompt: what should the bot do?');
@@ -238,6 +239,14 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { scope: 'X:\\AI-2', path: 'C:/m/no-telegram.md', name: 'no-telegram-no-multiple-choice', description: 'He does not use Telegram; ask in plain words', kind: 'feedback', modified: now - 3_600_000 },
     { scope: 'X:\\AI-2', path: 'C:/m/iphone.md', name: 'jordan-devices', description: 'iPhone 13 Pro', kind: 'user', modified: now - 7_200_000 },
   ] as T;
+  if (command === 'bot_channel_add') {
+    if (args.input.kind === 'telegram' && !String(args.input.secrets.token ?? '').includes(':')) throw new Error("That doesn't look like a Telegram bot token.");
+    const c = { id: `l${links.length + 1}`, botId: args.botId, kind: args.input.kind, label: args.input.label, enabled: true, status: 'Connected as @new_bot', secrets: Object.keys(args.input.secrets) };
+    links.push(c); return { ...c } as T;
+  }
+  if (command === 'bot_channel_set_enabled') { const c = links.find(l => l.id === args.channelId)!; c.enabled = args.enabled; c.status = args.enabled ? 'Connected as @hj_bot' : 'Off'; return { ...c } as T; }
+  if (command === 'bot_channel_remove') { links.splice(links.findIndex(l => l.id === args.channelId), 1); return undefined as T; }
+  if (command === 'bot_web_link') return 'http://127.0.0.1:9999/chat?t=x' as T;
   if (command === 'bot_activity') return (args.botId === 'b1' ? [
     { id: 1, kind: 'reply', summary: "I'm here, Jordan. What do you need?", detail: {}, at: now - 60_000 },
     { id: 2, kind: 'updated', summary: 'Skills and MCP servers changed', detail: {}, at: now - 7_200_000 },

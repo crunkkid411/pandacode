@@ -9,6 +9,7 @@ import { parseInbox } from './install-list';
 import { inboxItems, type InboxItem, type InboxSession, type Seen } from './inbox-facts';
 import { projectRows, sessionRows, type PcProject } from './sessions-facts';
 import { feedRows, type BotActivity } from './activity-facts';
+import type { PcChannel } from './connectors-facts';
 import { listRooms, oneRoom, roomStream, toRoom, type SharedChannel } from './chatrooms';
 import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
@@ -475,6 +476,22 @@ export const routes: Route[] = [
     const people = bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null }));
     return feedRows(people, Object.fromEntries(bots.map((b, i) => [b.id, logs[i]])), rows);
   } },
+  // Connectors: each agent's chat connections (connectors-facts.ts).
+  { method: 'GET', path: /^\/hub-connectors$/, run: async ({ call }) => {
+    const bots = await listBots(call);
+    const details = await Promise.all(bots.map(b => call<{ channels: PcChannel[] }>('bot_detail', { botId: b.id })));
+    return bots.map((b, i) => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null, channels: details[i].channels }));
+  } },
+  { method: 'POST', path: /^\/hub-connectors\/add$/, run: ({ call, body }) => {
+    const b = (body ?? {}) as { botId?: string; kind?: string; label?: string; config?: Record<string, string>; secrets?: Record<string, string> };
+    return call('bot_channel_add', { botId: b.botId ?? '', input: { kind: b.kind ?? '', label: b.label ?? '', config: b.config ?? {}, secrets: b.secrets ?? {} } });
+  } },
+  { method: 'POST', path: /^\/hub-connectors\/enabled$/, run: ({ call, body }) => {
+    const b = (body ?? {}) as { id?: string; enabled?: boolean };
+    return call('bot_channel_set_enabled', { channelId: b.id ?? '', enabled: Boolean(b.enabled) });
+  } },
+  { method: 'POST', path: /^\/hub-connectors\/remove$/, run: async ({ call, body }) => { await call('bot_channel_remove', { channelId: ((body ?? {}) as { id?: string }).id ?? '' }); return { ok: true }; } },
+  { method: 'POST', path: /^\/hub-connectors\/web-link$/, run: ({ call, body }) => call('bot_web_link', { channelId: ((body ?? {}) as { id?: string }).id ?? '' }) },
   // Chatrooms = bot group chats (chatrooms.ts).
   { method: 'GET', path: /^\/chatrooms$/, run: async ({ call }) => listRooms(call, await botNames(call)) },
   { method: 'GET', path: /^\/chatrooms\/([^/]+)$/, run: async ({ call, match }) => oneRoom(call, match[1], await botNames(call)) },
