@@ -3994,6 +3994,11 @@ pub fn run() {
         std::process::exit(local_signing::cli());
     }
     let app = tauri::Builder::default()
+        // Hub pages that are files on disk (the style guide), shown inside the Hub; see hub::page.
+        .register_asynchronous_uri_scheme_protocol(hub::PAGE_SCHEME, |_ctx, request, responder| {
+            let path = request.uri().path().to_string();
+            std::thread::spawn(move || responder.respond(hub::page(&path)));
+        })
         // First, as its docs require: a second launch focuses this window instead of opening another.
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             // A second `pandacode.exe --hub` (the desktop shortcut) opens the Hub in the
@@ -4089,6 +4094,15 @@ pub fn run() {
                     // Agents panel: PandaCode's bots and scheduled chats.
                     bots::bots_list,
                     bots::bot_set_paused,
+                    // SwarmClaw's Agents page and Org Chart: agents are PandaCode bots.
+                    bots::bot_detail,
+                    bots::bot_create,
+                    bots::bot_update,
+                    bots::bot_delete,
+                    bots::bot_desktop_thread,
+                    bots::bot_message,
+                    bots::bot_set_capabilities,
+                    bots::bot_set_org,
                     schedules::schedules_list,
                     schedules::schedule_set_enabled,
                     schedules::schedule_run_now,
@@ -4101,7 +4115,6 @@ pub fn run() {
                     usage_ledger::usage_ledger,
                     // Org chart panel: live agent sessions and their helpers.
                     hub_org::hub_org,
-                    hub::hub_open_style_guide,
                     // Skills panel: Jordan's own skill catalog.
                     hub_skills::hub_skills_list,
                     hub_skills::hub_skills_rebuild,
@@ -4263,7 +4276,7 @@ pub fn run() {
                 bots::failover::bot_failover_decide,
                 bots::failover::bot_failover_pending,
                 bots::failover::bot_model_switches,
-                bots::bot_set_capabilities, bots::bot_assign_task, bots::bot_task_links, bots::bot_task_brief,
+                bots::bot_set_capabilities, bots::bot_set_org, bots::bot_assign_task, bots::bot_task_links, bots::bot_task_brief,
                 bots::schedule::bot_schedule_create,
                 bots::schedule::bot_schedule_set_enabled,
                 bots::schedule::bot_schedule_delete,

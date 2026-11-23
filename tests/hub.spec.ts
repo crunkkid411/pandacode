@@ -131,7 +131,7 @@ const openAgents = async (page: Page) => { await page.goto('/hub-classic.html');
 
 test('agents: bots and scheduled chats show with their timing', async ({ page }) => {
   await openAgents(page);
-  await expect(page.getByRole('list', { name: 'Bots list' }).getByRole('listitem')).toHaveText([/Chief of Staff/, /Inbox Sorter.*Paused/]);
+  await expect(page.getByRole('list', { name: 'Bots list' }).getByRole('listitem')).toHaveText([/Chief of Staff/, /Inbox Sorter.*Paused/, /Clip Finder/]);
   await expect(page.getByRole('list', { name: 'Scheduled chats list' }).getByRole('listitem')).toHaveText([/Morning news digest.*Every day at 07:30/, /Check the build.*Every 30 min/]);
 });
 

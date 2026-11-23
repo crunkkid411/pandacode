@@ -4,6 +4,8 @@
 //! harness runs, approvals, the queue and history work unchanged.
 
 mod brief;
+pub(crate) mod org;
+pub(crate) use org::Org;
 pub(crate) mod channels;
 pub(crate) mod failover;
 pub(crate) mod gateway;
@@ -51,7 +53,8 @@ CREATE TABLE IF NOT EXISTS bots(
   while_working TEXT NOT NULL DEFAULT 'queue',
   show_plan INTEGER NOT NULL DEFAULT 0 CHECK(show_plan IN (0,1)),
   skills TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(skills)),
-  mcp TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(mcp)));
+  mcp TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(mcp)),
+  org TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(org)));
 CREATE TABLE IF NOT EXISTS bot_memories(
   id TEXT PRIMARY KEY,
   bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
@@ -172,7 +175,7 @@ CREATE INDEX IF NOT EXISTS bot_messages_source ON bot_messages(source_session_id
 
 /// Profile columns added after the bots table first shipped (schema 25). Fresh databases get
 /// them from `SCHEMA`; `upgrade` adds whichever are missing, so it is safe to run every start.
-const ADDED_COLUMNS: [(&str, &str); 7] = [
+const ADDED_COLUMNS: [(&str, &str); 8] = [
     ("color", "TEXT NOT NULL DEFAULT ''"),
     ("reasoning_effort", "TEXT NOT NULL DEFAULT ''"),
     ("backup_models", "TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(backup_models))"),
@@ -180,6 +183,7 @@ const ADDED_COLUMNS: [(&str, &str); 7] = [
     ("notify", "INTEGER NOT NULL DEFAULT 1 CHECK(notify IN (0,1))"),
     ("while_working", "TEXT NOT NULL DEFAULT 'queue'"),
     ("show_plan", "INTEGER NOT NULL DEFAULT 0 CHECK(show_plan IN (0,1))"),
+    ("org", "TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(org))"),
 ];
 
 pub(crate) fn upgrade(db: &rusqlite::Connection) -> Result<()> {
@@ -241,6 +245,8 @@ pub struct Bot {
     pub skills: Vec<String>,
     /// MCP server names from the harness's own config, by reference; never their definitions.
     pub mcp: Vec<String>,
+    /// The bot's place on the Hub's Org Chart (`Org`); `{}` when it has none.
+    pub org: Org,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -303,7 +309,7 @@ pub struct Thread {
     pub updated_at: i64,
 }
 
-const BOT_COLUMNS: &str = "id,name,role,instructions,goals,avatar,project_id,provider,model,mode,heartbeat_minutes,next_heartbeat_at,paused,memory_version,notify_channel_id,notify_thread,created_at,updated_at,color,reasoning_effort,backup_models,fallback_mode,notify,while_working,show_plan,soul,skills,mcp";
+const BOT_COLUMNS: &str = "id,name,role,instructions,goals,avatar,project_id,provider,model,mode,heartbeat_minutes,next_heartbeat_at,paused,memory_version,notify_channel_id,notify_thread,created_at,updated_at,color,reasoning_effort,backup_models,fallback_mode,notify,while_working,show_plan,soul,skills,mcp,org";
 
 fn bot_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Bot> {
     Ok(Bot {
@@ -335,6 +341,7 @@ fn bot_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Bot> {
         soul: r.get(25)?,
         skills: serde_json::from_str(&r.get::<_, String>(26)?).unwrap_or_default(),
         mcp: serde_json::from_str(&r.get::<_, String>(27)?).unwrap_or_default(),
+        org: serde_json::from_str(&r.get::<_, String>(28)?).unwrap_or_default(),
     })
 }
 
@@ -1006,6 +1013,15 @@ pub async fn bot_set_capabilities(app: tauri::AppHandle, window: tauri::WebviewW
 }
 
 /// Starts an ordinary task with a bot (or none). The window then applies the bot's harness and model.
+/// Saves a bot's place on the Hub's Org Chart (boss, team, coordinator or worker, card position).
+#[tauri::command]
+pub async fn bot_set_org(app: tauri::AppHandle, window: tauri::WebviewWindow, state: State<'_, AppState>, bot_id: String, org: Org) -> Result<Bot> {
+    guard_main(&window)?;
+    let bot = org::set_org(&*state.store.lock().map_err(|e| e.to_string())?, &bot_id, org)?;
+    let _ = app.emit("bots-changed", ());
+    Ok(bot)
+}
+
 #[tauri::command]
 pub async fn bot_assign_task(window: tauri::WebviewWindow, state: State<'_, AppState>, session_id: String, bot_id: Option<String>) -> Result<Option<Bot>> {
     guard_main(&window)?;

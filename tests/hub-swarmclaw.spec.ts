@@ -18,12 +18,15 @@ test('an unwired page address goes back to the Org Chart', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/org-chart');
 });
 
-test('org chart: Jordan on top, each live session under him, its helpers under it', async ({ page }) => {
+test('org chart: only his agents, the coordinator above its worker; no person, no terminal sessions', async ({ page }) => {
   await open(page, '/org-chart');
-  await expect(page.getByText('Build the Hub').first()).toBeVisible();
-  await expect(page.getByText('Find skill files').first()).toBeVisible();
-  await expect(page.getByText('Copying SwarmClaw pages').first()).toBeVisible();
-  expect((await calls(page, 'hub_org')).length).toBeGreaterThan(0);
+  await expect(page.getByText('Chief of Staff').first()).toBeVisible();
+  await expect(page.getByText('Inbox Sorter').first()).toBeVisible();
+  for (const gone of ['Build the Hub', 'Find skill files']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Jordan', { exact: true })).toHaveCount(1); // only his profile button, not a chart card
+  expect(await calls(page, 'hub_org')).toHaveLength(0);
+  expect((await calls(page, 'bots_list')).length).toBeGreaterThan(0);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-org-chart.png` });
 });
 
 test('skills: SwarmClaw skills page lists the catalog with made-for-you tags', async ({ page }) => {
@@ -47,10 +50,12 @@ test('usage: SwarmClaw usage page reads the usage ledger', async ({ page }) => {
   expect((await calls(page, 'usage_ledger')).length).toBeGreaterThan(0);
 });
 
-test('style guide: the sidebar button opens it with one command', async ({ page }) => {
+test('style guide: a Hub page like the others, showing the guide the app serves', async ({ page }) => {
   await open(page, '/org-chart');
   await page.getByRole('button', { name: 'Style Guide' }).click();
-  await expect.poll(async () => (await calls(page, 'hub_open_style_guide')).length).toBe(1);
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/style-guide');
+  await expect(page.locator('iframe[title="Style Guide"]')).toHaveAttribute('src', 'http://hubpage.localhost/style-guide');
+  await expect(page.getByRole('button', { name: 'Style Guide' })).toHaveAttribute('aria-current', 'page');
 });
 
 test('schedules: Windows tasks show, his own first; Run Now and Pause send the real task action', async ({ page }) => {
@@ -66,37 +71,34 @@ test('schedules: Windows tasks show, his own first; Run Now and Pause send the r
   await page.screenshot({ path: process.env.HUB_SHOT_DIR ? `${process.env.HUB_SHOT_DIR}/sc-schedules.png` : 'test-results/sc-schedules.png' });
 });
 
-test('agents: SwarmClaw chat lists his PandaCode chats; sending streams the real reply', async ({ page }) => {
-  await open(page, '/agents');
-  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/agents/chat-c2'); // newest chat opens
-  await expect(page.getByText('Fix the playlist scout').first()).toBeVisible();
-  await expect(page.getByText('Old archived chat')).toHaveCount(0);
-  await page.getByText('Fix the playlist scout').first().click();
-  await expect(page.getByText('It ran Qwen3.5-4B on the graphics card.').first()).toBeVisible();
+test('agents: each agent is a PandaCode bot; talking to one goes through the bot and streams its reply', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await expect(page.getByText('Clip Finder').first()).toBeVisible();
   const box = page.locator('textarea').first();
   await box.fill('check the logs');
   await box.press('Enter');
-  await expect.poll(async () => (await calls(page, 'send_message')).map(c => [c.args.sessionId, c.args.text])).toEqual([['c1', 'check the logs']]);
+  await expect.poll(async () => (await calls(page, 'bot_message')).map(c => [c.args.botId, c.args.text])).toEqual([['b1', 'check the logs']]);
   await expect(page.getByText('Done: check the logs').first()).toBeVisible();
+  expect(await calls(page, 'send_message')).toHaveLength(0); // never a plain chat send
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agents.png` });
 });
 
-test('org chart: a working PandaCode chat shows under Jordan; idle chats do not', async ({ page }) => {
-  await open(page, '/org-chart');
-  await expect(page.getByText('Write the shorts captions').first()).toBeVisible();
-  await expect(page.getByText('Fix the playlist scout')).toHaveCount(0);
-});
-
-test('agents: New chat makes a PandaCode chat with the same agent; pin sticks after reload; hollow buttons hidden', async ({ page }) => {
-  await open(page, '/agents/chat-c1');
-  await expect(page.getByText('It ran Qwen3.5-4B on the graphics card.').first()).toBeVisible();
-  for (const hollow of ['Toggle voice', 'Toggle inspector', 'Add attachment', 'Select chats']) await expect(page.getByRole('button', { name: hollow })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Chat menu' }).click();
-  await expect(page.getByText('Delete Chat')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Start a new chat session' }).click();
-  await expect.poll(async () => (await calls(page, 'chat_create')).map(c => [c.args.provider, c.args.model])).toEqual([['claude', 'default']]);
+test('agents: SwarmClaw layout with Chat and Config tabs and + Agent; pin sticks after reload', async ({ page }) => {
+  await open(page, '/agents/b1');
+  for (const tab of ['chat', 'config']) await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pin agent' }).first().click({ force: true });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Unpin agent' })).toHaveCount(1);
+});
+
+test('agents: + Agent opens the SwarmClaw agent form and saves a new PandaCode bot', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByPlaceholder('e.g. SEO Researcher').fill('Thumbnail Maker');
+  await page.getByPlaceholder('What does this agent do?').fill('Makes thumbnail ideas');
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-form.png`, fullPage: true });
+  await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.role])).toEqual([['Thumbnail Maker', 'Makes thumbnail ideas']]);
+  await expect(page.getByText('Thumbnail Maker').first()).toBeVisible();
+  expect(['claude', 'opencode']).toContain((await calls(page, 'bot_create'))[0].args.input.provider); // a harness installed here
 });

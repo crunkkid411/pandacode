@@ -15,11 +15,9 @@ export default function AgentsPage() {
   const appSettings = useAppStore((s) => s.appSettings)
   const redirected = useRef(false)
 
-  // Hub: only PandaCode chats can be talked to; open the newest one.
-  const chatAgents = Object.values(agents).filter((a) => a.threadSessionId).sort((a, b) => b.updatedAt - a.updatedAt)
   const defaultAgent = appSettings.defaultAgentId && agents[appSettings.defaultAgentId]
     ? agents[appSettings.defaultAgentId]
-    : chatAgents[0] || null
+    : Object.values(agents)[0] || null
 
   // On desktop, auto-redirect to the default (or first) agent instead of showing a placeholder
   useEffect(() => {

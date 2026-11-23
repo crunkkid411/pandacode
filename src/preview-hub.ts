@@ -27,10 +27,15 @@ const messages: Record<string, ChatMessage[]> = {
 let nextId = 100;
 
 // Agents: PandaCode's bots and scheduled chats.
-const bots: HubBot[] = [
-  { id: 'b1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null },
-  { id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null },
+// Agents are bots (bots.rs): b1 coordinates b2 on the Org Chart; b3 is not placed on it yet.
+type MockBot = HubBot & Record<string, any>;
+const profile = { instructions: '', goals: '', soul: '', avatar: '', mode: 'ask', color: '', reasoningEffort: '', backupModels: [], fallbackMode: 'ask', notify: true, whileWorking: 'queue', showPlan: false, skills: [], mcp: [], createdAt: now - 9e6, updatedAt: now - 9e6, desktopSession: null };
+const bots: MockBot[] = [
+  { ...profile, id: 'b1', name: 'Chief of Staff', role: 'Morning brief', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 60, nextHeartbeatAt: now + 25 * 60_000, lastMessage: null, org: { parentId: null, swarmRole: 'coordinator', onChart: true } },
+  { ...profile, id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null, org: { parentId: 'b1', swarmRole: 'worker', onChart: true } },
+  { ...profile, id: 'b3', name: 'Clip Finder', role: 'Finds clips in streams', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 0, nextHeartbeatAt: null, lastMessage: null, org: {} },
 ];
+const botById = (id: string) => { const b = bots.find(x => x.id === id); if (!b) throw new Error('This bot no longer exists.'); return b; };
 const schedules: HubSchedule[] = [
   { id: 's1', title: 'Morning news digest', sessionTitle: 'News', projectName: 'AI-2', prompt: 'Summarise AI news', kind: 'daily', intervalMinutes: null, timeOfDay: '07:30', days: [], watchSessionTitle: null, nextRunAt: now + 3 * 3_600_000, lastRunAt: now - 20 * 3_600_000, enabled: true, runCount: 12 },
   { id: 's2', title: 'Check the build', sessionTitle: 'Build', projectName: 'pandacode', prompt: 'Run the tests', kind: 'interval', intervalMinutes: 30, timeOfDay: null, days: [], watchSessionTitle: null, nextRunAt: now + 10 * 60_000, lastRunAt: now - 20 * 60_000, enabled: false, runCount: 3 },
@@ -63,7 +68,18 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       return undefined;
     }
     case 'bots_list': return bots.map(b => ({ ...b }));
-    case 'bot_set_paused': { const b = bots.find(x => x.id === args.botId); if (!b) throw new Error('No bot'); b.paused = Boolean(args.paused); return { ...b }; }
+    case 'bot_set_paused': { const b = botById(args.botId); b.paused = Boolean(args.paused); return { ...b }; }
+    case 'bot_create': { if (!['claude', 'opencode', 'codex'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b: MockBot = { ...profile, ...args.input, id: `b${nextId++}`, paused: false, nextHeartbeatAt: null, lastMessage: null, org: {}, createdAt: Date.now(), updatedAt: Date.now() }; bots.push(b); return { ...b }; }
+    case 'bot_update': { if (!['claude', 'opencode', 'codex'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b = botById(args.botId); Object.assign(b, args.input, { updatedAt: Date.now() }); return { ...b }; }
+    case 'bot_delete': { bots.splice(bots.indexOf(botById(args.botId)), 1); return undefined; }
+    case 'bot_set_org': { const b = botById(args.botId); if (args.org.parentId === b.id) throw new Error('A bot cannot report to itself or to a bot that reports to it.'); b.org = { ...args.org }; return { ...b }; }
+    case 'bot_set_capabilities': { const b = botById(args.botId); b.skills = args.skills; b.mcp = args.mcp; return { ...b }; }
+    case 'bot_desktop_thread': {
+      const b = botById(args.botId);
+      if (!b.desktopSession) { const c: Chat = { id: `t-${b.id}`, title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id; }
+      return b.desktopSession;
+    }
+    case 'bot_message': return invokeChats('send_message', { sessionId: invokeChats('bot_desktop_thread', args), text: args.text });
     case 'schedules_list': return schedules.map(x => ({ ...x }));
     case 'schedule_set_enabled': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.enabled = Boolean(args.enabled); return { ...x }; }
     case 'schedule_run_now': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.runCount++; x.lastRunAt = Date.now(); return { scheduleId: x.id }; }

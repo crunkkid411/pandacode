@@ -614,49 +614,43 @@ mod tests {
     }
 }
 
-/// Jordan's visual style guide, made by an earlier agent as one HTML page (2026-11-17).
-pub(crate) const STYLE_GUIDE: &str = "file:///X:/AI-2/visual-style-menu/visual-style-menu.html";
-const STYLE_GUIDE_LABEL: &str = "style-guide";
+/// Jordan's visual style guide, made by an earlier agent as one self-contained HTML page (2026-11-17).
+const STYLE_GUIDE_FILE: &str = r"X:\AI-2\visual-style-menu\visual-style-menu.html";
+/// The app's own address for Hub pages that are files on disk; the Hub shows them in a frame.
+/// On Windows the page is reached as http://hubpage.localhost/<name>. tauri.conf.json allows
+/// framing only this address.
+pub(crate) const PAGE_SCHEME: &str = "hubpage";
 
-/// Only the style guide page itself and the local files it shows may load in its window.
-pub(crate) fn style_guide_may_load(url: &tauri::Url) -> bool {
-    url.scheme() == "file" || url.as_str().starts_with("data:")
-}
-
-/// Opens the style guide in its own window as a plain page (file:// so its local videos play),
-/// with no access to Hub commands. A second click focuses the open one.
-#[tauri::command]
-pub async fn hub_open_style_guide(app: AppHandle) -> Result<(), String> {
-    let handle = app.clone();
-    app.run_on_main_thread(move || {
-        if let Some(window) = handle.get_webview_window(STYLE_GUIDE_LABEL) {
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-            return;
-        }
-        let Ok(url) = STYLE_GUIDE.parse() else { return };
-        let built = tauri::WebviewWindowBuilder::new(&handle, STYLE_GUIDE_LABEL, tauri::WebviewUrl::External(url))
-            .title("Style Guide")
-            .inner_size(1280.0, 860.0)
-            .background_color(tauri::window::Color(14, 14, 20, 255))
-            .on_navigation(|url| style_guide_may_load(url))
-            .build();
-        if let Err(error) = built {
-            eprintln!("Style guide window failed to open: {error}");
-        }
-    })
-    .map_err(|e| e.to_string())
+/// Answers one request to the hubpage address. Only the named pages are served, never a path
+/// from the request, so nothing else on disk can be read through it.
+pub(crate) fn page(path: &str) -> tauri::http::Response<Vec<u8>> {
+    let file = match path {
+        "/style-guide" => STYLE_GUIDE_FILE,
+        _ => return tauri::http::Response::builder().status(404).body(b"Not a Hub page".to_vec()).unwrap_or_default(),
+    };
+    match std::fs::read(file) {
+        Ok(body) => tauri::http::Response::builder()
+            .header("Content-Type", "text/html; charset=utf-8")
+            .body(body)
+            .unwrap_or_default(),
+        Err(error) => tauri::http::Response::builder()
+            .status(404)
+            .header("Content-Type", "text/plain; charset=utf-8")
+            .body(format!("The style guide file could not be read: {STYLE_GUIDE_FILE} ({error})").into_bytes())
+            .unwrap_or_default(),
+    }
 }
 
 #[cfg(test)]
-mod style_guide_tests {
+mod page_tests {
     use super::*;
 
     #[test]
-    fn style_guide_window_stays_on_local_files() {
-        assert!(style_guide_may_load(&STYLE_GUIDE.parse().unwrap()));
-        assert!(!style_guide_may_load(&"https://example.com".parse().unwrap()));
-        assert!(std::path::Path::new(r"X:\AI-2\visual-style-menu\visual-style-menu.html").exists());
+    fn serves_the_style_guide_and_nothing_else() {
+        let guide = page("/style-guide");
+        assert_eq!(guide.status(), 200);
+        assert!(String::from_utf8_lossy(&guide.body()[..2000]).to_lowercase().contains("<html"));
+        assert_eq!(page("/../../Windows/win.ini").status(), 404);
+        assert_eq!(page("/style-guide/../x").status(), 404);
     }
 }

@@ -1,6 +1,7 @@
 use rusqlite::params;
 use super::channels::{self, discord, http, slack, telegram, web, whatsapp};
 use super::{brief, gateway, guard, schedule, *};
+use super::org::{set_org, team_text};
 use serde_json::json;
 use super::shared_channels::Running;
 
@@ -824,4 +825,24 @@ fn project_tasks_get_their_own_bot_brief_and_skill_union() {
     // A bot's own conversation is never relinked to another bot.
     let (thread, _) = thread_session(&f.store, &writer, DESKTOP, DESKTOP, "x").unwrap();
     assert!(assign_task(&f.store, &thread, Some(&reviewer.id)).is_err());
+}
+
+#[test]
+fn org_chart_place_saves_refuses_loops_and_briefs_the_team() {
+    let f = fixture();
+    let ceo = create(&f.store, &input("Chief"), &f.root).unwrap();
+    let editor = create(&f.store, &input("Editor"), &f.root).unwrap();
+    let place = |parent: Option<&str>, role: &str| Org { parent_id: parent.map(str::to_owned), swarm_role: role.into(), on_chart: true, x: Some(10.0), y: Some(20.0), ..Default::default() };
+    set_org(&f.store, &ceo.id, place(None, "coordinator")).unwrap();
+    let saved = set_org(&f.store, &editor.id, place(Some(&ceo.id), "anything")).unwrap();
+    assert_eq!((saved.org.parent_id.as_deref(), saved.org.swarm_role.as_str(), saved.org.x), (Some(ceo.id.as_str()), "worker", Some(10.0)));
+    assert!(get(&f.store, &ceo.id).unwrap().memory_version > ceo.memory_version, "the boss re-briefs with its new team");
+    assert!(set_org(&f.store, &ceo.id, place(Some(&editor.id), "coordinator")).is_err(), "no loops");
+    assert!(set_org(&f.store, &ceo.id, place(Some(&ceo.id), "coordinator")).is_err(), "not its own boss");
+    assert!(set_org(&f.store, &ceo.id, place(Some("gone"), "coordinator")).is_err());
+    let boss_text = team_text(&f.store, &get(&f.store, &ceo.id).unwrap()).unwrap();
+    assert!(boss_text.contains("Editor (Research assistant)") && boss_text.contains("pandacode_bot_message_bot"), "{boss_text}");
+    assert!(team_text(&f.store, &get(&f.store, &editor.id).unwrap()).unwrap().contains("You report to Chief"));
+    // A profile edit keeps the chart place.
+    assert_eq!(update(&f.store, &editor.id, &input("Editor")).unwrap().org.parent_id.as_deref(), Some(ceo.id.as_str()));
 }

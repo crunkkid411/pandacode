@@ -3,6 +3,7 @@
 import { createRoot } from 'react-dom/client';
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { installAdapter } from './adapter';
+import { STYLE_GUIDE_PATH, StyleGuidePage } from './style-guide-item';
 import { usePathname } from './shims/next-navigation';
 import { TooltipProvider } from '../sc/components/ui/tooltip';
 import { Toaster } from '../sc/components/ui/sonner';
@@ -35,6 +36,7 @@ function pageFor(path: string): ComponentType | null {
 
 function Page() {
   const path = usePathname();
+  if (path === STYLE_GUIDE_PATH) return <StyleGuidePage />; // Hub page of our own, not one of SwarmClaw's
   const Shown = pageFor(path);
   const Layout = layoutFor(path);
   if (!Shown) return <p className="p-8 text-text-3">This page is not in the Hub.</p>;

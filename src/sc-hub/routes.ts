@@ -2,87 +2,42 @@
 import type { Agent, ProviderInfo, Skill } from '../sc/types';
 import { work, type Ledger } from '../hub/usage-facts';
 import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
+import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, updateBotAgent } from './bot-agents';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 interface Ctx { call: Call; match: RegExpMatchArray; query: URLSearchParams; body: unknown }
 export interface Route { method: string; path: RegExp; run: (ctx: Ctx) => Promise<unknown> }
 
-interface OrgHelper { id: string; description: string; agentType: string; model: string; state: string; lastWords: string; updatedMs: number; log: string }
-interface OrgSession { pid: number; sessionId: string; title: string; cwd: string; status: string; startedMs: number; lastWords: string; log: string; helpers: OrgHelper[] }
-interface Proc { pid: number; name: string; label: string; kind: string; startedMs: number }
-
 const NAMES: Record<string, string> = { opencode: 'OpenCode', hermes: 'Hermes Agent', codex: 'Codex', vibe: 'Vibe', kilo: 'Kilo Code', qwen: 'Qwen Code', claude: 'Claude Code' };
 
-function agent(id: string, name: string, description: string, extra: Partial<Agent>): Agent {
-  return { id, name, description, systemPrompt: '', provider: 'claude-cli', model: '', createdAt: 0, updatedAt: 0, ...extra } as Agent;
-}
-
-/** Jordan on top, every Claude Code session running now under him, each session's helpers under it,
- *  and every other agent program that is running. */
-export async function orgAgents(call: Call): Promise<Record<string, Agent>> {
-  const [sessions, now, chats] = await Promise.all([
-    call<OrgSession[]>('hub_org'),
-    call<{ processes: Proc[] }>('hub_running_now').catch(() => ({ processes: [] as Proc[] })),
-    pcChats(call).catch(() => [] as Chat[]),
-  ]);
-  const out: Record<string, Agent> = {
-    jordan: agent('jordan', 'Jordan', 'You', { role: 'coordinator', emoji: '👑', orgChart: { parentId: null } }),
-  };
-  const sessionPids = new Set(sessions.map(s => s.pid));
-  for (const s of sessions) {
-    const id = `session-${s.sessionId}`;
-    out[id] = agent(id, s.title, s.lastWords || s.cwd, {
-      role: 'coordinator', model: 'Claude Code', emoji: s.status === 'busy' ? '🟢' : '💤',
-      orgChart: { parentId: 'jordan', teamLabel: 'Claude Code', teamColor: '#818cf8' },
-      updatedAt: s.startedMs, createdAt: s.startedMs,
-    });
-    for (const h of s.helpers) {
-      out[`helper-${h.id}`] = agent(`helper-${h.id}`, h.description || h.agentType, h.lastWords || h.agentType, {
-        model: h.model, emoji: h.state === 'working' ? '🟢' : h.state === 'done' ? '✅' : '⏸️',
-        orgChart: { parentId: id }, updatedAt: h.updatedMs, createdAt: h.updatedMs,
-      });
-    }
-  }
-  for (const p of now.processes) {
-    const stem = p.name.toLowerCase().replace(/\.exe$/, '');
-    if (p.kind !== 'agent' || stem === 'pandacode' || sessionPids.has(p.pid)) continue;
-    if (stem === 'claude') continue; // helper claude.exe processes belong to the sessions above
-    const id = `proc-${p.pid}`;
-    out[id] = agent(id, NAMES[stem] ?? p.label, `Running (process ${p.pid})`, {
-      emoji: '🟢', orgChart: { parentId: 'jordan', teamLabel: 'Other agents', teamColor: '#34d399' }, createdAt: p.startedMs, updatedAt: p.startedMs,
-    });
-  }
+/** His agents (PandaCode bots), with the pins he set in this window. The Org Chart shows the ones
+ *  he placed on it; live terminal sessions are not agents and are not on it. */
+export async function botAgents(call: Call): Promise<Record<string, Agent>> {
   const pinned = new Set(saved().pinned);
-  for (const c of chats) out[`chat-${c.id}`] = { ...chatAgent(c), pinned: pinned.has(`chat-${c.id}`) };
-  return out;
+  return Object.fromEntries((await listBots(call)).map(b => [b.id, { ...botAgent(b), pinned: pinned.has(b.id) }]));
 }
 
-// ---- PandaCode chats as SwarmClaw agents (Agents page = chat with each one) ----
+// ---- PandaCode conversations in SwarmClaw's chat shape (an agent's chat is its bot's own thread) ----
 interface PcMessage { id: number; role: string; content: string; createdAt: number }
 
 /** PandaCode chats, newest first; archived and draft chats left out. */
 const pcChats = async (call: Call) => visibleChats(await call<Chat[]>('list_sessions'));
 
-function chatSession(c: Chat) {
+function chatSession(c: Chat, agentId: string | null = null) {
   return { id: c.id, name: c.title || 'New chat', cwd: '', user: 'Jordan', provider: c.provider, model: c.model, claudeSessionId: null,
-    messages: [], agentId: `chat-${c.id}`, createdAt: c.createdAt, updatedAt: c.updatedAt,
+    messages: [], agentId, createdAt: c.createdAt, updatedAt: c.updatedAt,
     lastActiveAt: Math.max(c.lastResponseAt ?? 0, c.lastPromptAt ?? 0, c.updatedAt), active: chatState(c.status) === 'working' };
 }
 
-function chatAgent(c: Chat): Agent {
-  const live = chatState(c.status) !== 'idle';
-  return agent(`chat-${c.id}`, c.title || 'New chat', `${NAMES[c.provider] ?? c.provider} · ${c.model}`, {
-    provider: c.provider as Agent['provider'], model: c.model, threadSessionId: c.id,
-    // Only chats that are working or waiting go on the Org Chart; the rest stay on the Agents page.
-    ...(live ? { orgChart: { parentId: 'jordan', teamLabel: 'PandaCode chats', teamColor: '#f59e0b' } } : {}),
-    createdAt: c.createdAt, updatedAt: chatSession(c).lastActiveAt,
-  });
-}
+/** The bot whose own thread this conversation is, if any. */
+const botOfThread = async (call: Call, sessionId: string) => (await listBots(call)).find(b => b.desktopSession === sessionId)?.id ?? null;
 
 /** PandaCode's message rows in SwarmClaw's shape. Errors show as the agent's reply with a warning sign. */
 // ponytail: tool and system rows are left out; add them as SwarmClaw toolEvents if he wants to see them.
+// A bot's standing instructions ride on the end of his message (bots/brief.rs HEADER); show only his words.
+const withoutBrief = (text: string) => { const at = text.indexOf('\n\nBot brief:'); return at < 0 ? text : text.slice(0, at); };
 const toMessages = (rows: PcMessage[]) => rows.flatMap(m =>
-  m.role === 'user' || m.role === 'assistant' ? [{ role: m.role, text: m.content, time: m.createdAt, kind: 'chat' }]
+  m.role === 'user' || m.role === 'assistant' ? [{ role: m.role, text: m.role === 'user' ? withoutBrief(m.content) : m.content, time: m.createdAt, kind: 'chat' }]
     : m.role === 'error' ? [{ role: 'assistant', text: `⚠️ ${m.content}`, time: m.createdAt, kind: 'chat' }] : []);
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -96,7 +51,10 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500):
       const send = (e: Record<string, unknown>) => out.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`));
       try {
         const before = (await call<{ messages: PcMessage[] }>('get_messages', { sessionId: id })).messages.at(-1)?.id ?? 0;
-        await call('send_message', { sessionId: id, text });
+        // An agent's own thread goes through the bot, so it gets its brief, team and queue.
+        const botId = await botOfThread(call, id);
+        if (botId) await call('bot_message', { botId, text });
+        else await call('send_message', { sessionId: id, text });
         const started = Date.now();
         let shown = '', errors = 0, sawWork = false;
         while (Date.now() - started < 60 * 60_000) {
@@ -132,7 +90,7 @@ async function chatMessages(call: Call, id: string, limit: string | null) {
 async function oneChat(call: Call, id: string) {
   const c = (await call<Chat[]>('list_sessions')).find(x => x.id === id);
   if (!c) throw new Error('That chat no longer exists in PandaCode.');
-  return chatSession(c);
+  return chatSession(c, await botOfThread(call, id));
 }
 
 interface HubSkill { kind: string; name: string; description: string; places: string[]; path: string; ours: boolean }
@@ -153,7 +111,7 @@ async function skills(call: Call, command = 'hub_skills_list'): Promise<Record<s
 /** Agents installed on this PC, with the models each one offers. */
 async function providers(call: Call): Promise<ProviderInfo[]> {
   const list = await call<HubProvider[]>('list_providers');
-  return list.filter(p => p.installed).map(p => ({ id: p.id, name: p.name, models: (p.models ?? []).map(m => m.name || m.id), requiresApiKey: false, requiresEndpoint: false }));
+  return list.filter(p => p.installed).map(p => ({ id: p.id, name: p.name, models: (p.models ?? []).map(m => m.id), requiresApiKey: false, requiresEndpoint: false }));
 }
 
 const RANGE_HOURS: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
@@ -240,13 +198,25 @@ export const routes: Route[] = [
     save(s);
     return { ...BASE_SETTINGS, ...s.settings };
   } },
-  { method: 'PUT', path: /^\/agents\/([^/]+)$/, run: async ({ match, body }) => {
-    const b = (body ?? {}) as { pinned?: boolean };
-    if (typeof b.pinned !== 'boolean') throw new Error('Only pinning is supported here.');
-    const s = saved();
-    s.pinned = s.pinned.filter(id => id !== match[1]).concat(b.pinned ? [match[1]] : []);
-    save(s);
-    return { ok: true };
+  { method: 'PUT', path: /^\/agents\/([^/]+)$/, run: async ({ call, match, body }) => {
+    const { pinned, ...rest } = (body ?? {}) as Partial<Agent>;
+    if (typeof pinned === 'boolean') {
+      const s = saved();
+      s.pinned = s.pinned.filter(id => id !== match[1]).concat(pinned ? [match[1]] : []);
+      save(s);
+    }
+    return Object.keys(rest).length ? updateBotAgent(call, match[1], rest) : { ok: true };
+  } },
+  { method: 'POST', path: /^\/agents$/, run: ({ call, body }) => createBotAgent(call, (body ?? {}) as Partial<Agent>) },
+  { method: 'DELETE', path: /^\/agents\/([^/]+)$/, run: ({ call, match }) => deleteBotAgent(call, match[1]) },
+  // Org Chart drags and team edits: one save per agent.
+  { method: 'PATCH', path: /^\/agents\/bulk$/, run: async ({ call, body }) => {
+    const errors: string[] = [];
+    let updated = 0;
+    for (const { id, patch } of ((body as { patches?: { id: string; patch: Partial<Agent> }[] } | null)?.patches ?? [])) {
+      try { await updateBotAgent(call, id, patch); updated++; } catch (e) { errors.push(String(e)); }
+    }
+    return { updated, errors };
   } },
   { method: 'GET', path: /^\/chats$/, run: async ({ call }) => Object.fromEntries((await pcChats(call)).map(c => [c.id, chatSession(c)])) },
   { method: 'GET', path: /^\/chats\/([^/]+)$/, run: ({ call, match }) => oneChat(call, match[1]) },
@@ -267,7 +237,7 @@ export const routes: Route[] = [
   // PandaCode has no message queue or context meter to show: an empty queue, and null hides the meter.
   { method: 'GET', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ match }) => ({ sessionId: match[1], activeRunId: null, queueLength: 0, items: [] }) },
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-status$/, run: async () => null },
-  { method: 'POST', path: /^\/agents\/chat-([^/]+)\/thread$/, run: ({ call, match }) => oneChat(call, match[1]) },
+  { method: 'POST', path: /^\/agents\/([^/]+)\/thread$/, run: async ({ call, match }) => oneChat(call, await botThread(call, match[1])) },
   { method: 'GET', path: /^\/schedules$/, run: ({ call }) => schedules(call) },
   { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => { await call('hub_task_run_now', { path: pathOf(match[1]) }); return { ok: true, queued: true }; } },
   { method: 'PUT', path: /^\/schedules\/([^/]+)$/, run: async ({ call, match, body }) => {
@@ -280,7 +250,7 @@ export const routes: Route[] = [
   { method: 'POST', path: /^\/auth$/, run: async () => ({ ok: true }) },
   { method: 'GET', path: /^\/settings$/, run: async () => ({ ...BASE_SETTINGS, ...saved().settings }) },
   { method: 'GET', path: /^\/credentials$/, run: async () => ({}) },
-  { method: 'GET', path: /^\/agents$/, run: ({ call }) => orgAgents(call) },
+  { method: 'GET', path: /^\/agents$/, run: ({ call }) => botAgents(call) },
   { method: 'GET', path: /^\/skills$/, run: ({ call }) => skills(call) },
   { method: 'GET', path: /^\/providers$/, run: ({ call }) => providers(call) },
   { method: 'GET', path: /^\/providers\/configs$/, run: async () => [] },

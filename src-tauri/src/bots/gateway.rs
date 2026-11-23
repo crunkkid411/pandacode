@@ -82,7 +82,8 @@ fn compose(app: &tauri::AppHandle, store: &Store, bot: &Bot, session_id: &str, k
     }
     let memories = super::memories(store, &bot.id)?;
     super::mark_briefed(store, session_id, bot.memory_version)?;
-    Ok(format!("{text}{}{skills}", brief::compose(bot, &memories, kind, sender)))
+    let team = super::org::team_text(store, bot)?;
+    Ok(format!("{text}{}{team}{skills}", brief::compose(bot, &memories, kind, sender)))
 }
 
 /// A harness switch starts a fresh native session fed by a 64 KiB history replay
@@ -505,7 +506,7 @@ mod tests {
             project_id: "project".into(), provider: "claude".into(), model: "sonnet".into(), mode: "ask".into(), heartbeat_minutes: 0,
             next_heartbeat_at: None, paused: false, memory_version: 0, notify_channel_id: None, notify_thread: None, created_at: 0, updated_at: 0,
             color: String::new(), reasoning_effort: String::new(), backup_models: Vec::new(), fallback_mode: "ask".into(), notify: true,
-            while_working: while_working.into(), show_plan: false, soul: String::new(), skills: Vec::new(), mcp: Vec::new(),
+            while_working: while_working.into(), show_plan: false, soul: String::new(), skills: Vec::new(), mcp: Vec::new(), org: Default::default(),
         }
     }
 
