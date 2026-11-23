@@ -280,10 +280,10 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-status$/, run: async () => null },
   { method: 'POST', path: /^\/agents\/([^/]+)\/thread$/, run: async ({ call, match }) => oneChat(call, await botThread(call, match[1])) },
   // Schedules: his agents' own schedules (ids "bs-...") first, then his Windows tasks.
-  { method: 'GET', path: /^\/schedules$/, run: async ({ call }) => ({
-    ...Object.fromEntries((await botSchedules(call)).map(s => [PREFIX + s.id, scSchedule(s)])),
-    ...(await schedules(call)),
-  }) },
+  { method: 'GET', path: /^\/schedules$/, run: async ({ call }) => {
+    const [bots, windows] = await Promise.all([botSchedules(call), schedules(call)]);
+    return { ...Object.fromEntries(bots.map(s => [PREFIX + s.id, scSchedule(s)])), ...windows };
+  } },
   { method: 'POST', path: /^\/schedules\/preview$/, run: async ({ body }) => preview((body ?? {}) as Partial<Schedule>) },
   { method: 'POST', path: /^\/schedules$/, run: ({ call, body }) => createBotSchedule(call, (body ?? {}) as Partial<Schedule>) },
   { method: 'POST', path: /^\/schedules\/([^/]+)\/run$/, run: async ({ call, match }) => {

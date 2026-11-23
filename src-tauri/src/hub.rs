@@ -335,10 +335,30 @@ fn read_tasks() -> Result<Vec<Task>, String> {
     run_with_timeout(command, Duration::from_secs(20)).map(|out| parse_schtasks_csv(&out))
 }
 
+static TASKS_REFRESHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Reads the task list on its own thread (schtasks takes about 2 s here) and stores it.
+pub(crate) fn refresh_tasks_in_background() {
+    use std::sync::atomic::Ordering;
+    if TASKS_REFRESHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| {
+        let read = read_tasks();
+        if let Ok(mut cache) = CACHE.lock() {
+            cache.tasks = Some((Instant::now(), read));
+        }
+        TASKS_REFRESHING.store(false, Ordering::SeqCst);
+    });
+}
+
 fn tasks_cached(cache: &mut Cache, force: bool) -> Result<Vec<Task>, String> {
     let fresh = matches!(&cache.tasks, Some((at, _)) if at.elapsed() < TASKS_MAX_AGE);
-    if force || !fresh {
+    if force || cache.tasks.is_none() {
         cache.tasks = Some((Instant::now(), read_tasks()));
+    } else if !fresh {
+        // A stale list shows at once; the new one is there on the next look (every few seconds).
+        refresh_tasks_in_background();
     }
     cache.tasks.as_ref().map(|(_, r)| r.clone()).unwrap_or_else(|| Ok(Vec::new()))
 }
@@ -418,6 +438,10 @@ pub async fn hub_task_set_enabled(path: String, enabled: bool) -> Result<(), Str
 
 /// Opens the Hub window, or shows and focuses it when it is already open.
 pub(crate) fn open(app: &AppHandle) -> Result<(), String> {
+    // The Schedules and Running-now pages need the task list; start the ~2 s read now.
+    if CACHE.lock().map(|c| c.tasks.is_none()).unwrap_or(false) {
+        refresh_tasks_in_background();
+    }
     if let Some(window) = app.get_webview_window(LABEL) {
         let _ = window.unminimize();
         window.show().map_err(|e| e.to_string())?;
