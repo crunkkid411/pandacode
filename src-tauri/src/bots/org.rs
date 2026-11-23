@@ -67,6 +67,12 @@ pub(crate) fn set_org(store: &Store, id: &str, org: Org) -> Result<Bot> {
     get(store, id)
 }
 
+/// An agent was added, removed or paused: coordinators' "who you can reach" lists change.
+pub(crate) fn rebrief_coordinators(store: &Store) -> Result<()> {
+    store.db.execute("UPDATE bots SET memory_version=memory_version+1 WHERE json_extract(org,'$.swarmRole')='coordinator'", []).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// The brief's team section: who this bot hands work to and who it reports to.
 pub(crate) fn team_text(store: &Store, bot: &Bot) -> Result<String> {
     let bots = list(store)?;
@@ -80,6 +86,17 @@ pub(crate) fn team_text(store: &Store, bot: &Bot) -> Result<String> {
 hand each piece to the best-suited member with pandacode_bot_message_bot, then combine their updates into one result for the user.\n",
             reports.join("; ")
         ));
+    }
+    // A Chief of Staff (a coordinator at the top with no one placed under it) can reach everyone,
+    // as in MausBot's Chief of Staff; `rebrief_coordinators` keeps this list current.
+    if reports.is_empty() && boss.is_none() && bot.org.swarm_role == "coordinator" {
+        let others: Vec<String> = bots.iter().filter(|b| b.id != bot.id && !b.paused).map(describe).collect();
+        if !others.is_empty() {
+            text.push_str(&format!(
+                "\nAgents you can hand work to: {}. Hand a job to the best-suited one with pandacode_bot_message_bot, then combine their updates into one result for the user.\n",
+                others.join("; ")
+            ));
+        }
     }
     if let Some(boss) = boss {
         text.push_str(&format!("\nYou report to {}. When {} hands you work, do it and send the result back to {} with pandacode_bot_message_bot.\n", describe(boss), boss.name, boss.name));

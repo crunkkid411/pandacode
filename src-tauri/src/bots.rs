@@ -595,6 +595,7 @@ pub(crate) fn create(store: &Store, input: &BotInput, root: &std::path::Path) ->
         )
         .map_err(|e| e.to_string())?;
     log(store, &id, "created", &format!("Created {}", input.name), json!({}))?;
+    org::rebrief_coordinators(store)?;
     get(store, &id)
 }
 
@@ -612,6 +613,9 @@ pub(crate) fn update(store: &Store, id: &str, input: &BotInput) -> Result<Bot> {
             params![id, input.name, input.role, input.instructions, input.goals, input.avatar, input.provider, input.model, input.mode, input.heartbeat_minutes, next, brief_changed as i64, now, input.color, input.reasoning_effort, json!(input.backup_models).to_string(), input.fallback_mode, input.notify, input.while_working, input.show_plan, input.soul],
         )
         .map_err(|e| e.to_string())?;
+    if before.name != input.name || before.role != input.role {
+        org::rebrief_coordinators(store)?;
+    }
     if before.name != input.name {
         store.db.execute("UPDATE projects SET name=?2 WHERE id=?1", params![before.project_id, input.name]).map_err(|e| e.to_string())?;
     }
@@ -638,6 +642,7 @@ fn sync_thread_profile(store: &Store, bot: &Bot, session_id: &str) -> Result<()>
 
 pub(crate) fn set_paused(store: &Store, id: &str, paused: bool) -> Result<Bot> {
     store.db.execute("UPDATE bots SET paused=?2,updated_at=?3 WHERE id=?1", params![id, paused, crate::storage::now()]).map_err(|e| e.to_string())?;
+    org::rebrief_coordinators(store)?;
     log(store, id, if paused { "paused" } else { "resumed" }, if paused { "Paused" } else { "Resumed" }, json!({}))?;
     get(store, id)
 }
@@ -671,6 +676,7 @@ pub(crate) fn delete(store: &Store, id: &str) -> Result<()> {
         secrets::remove_all(&channel);
     }
     store.db.execute("DELETE FROM bots WHERE id=?1", [id]).map_err(|e| e.to_string())?;
+    org::rebrief_coordinators(store)?;
     shared_channels::settle_posts(store, &open)?;
     Ok(())
 }

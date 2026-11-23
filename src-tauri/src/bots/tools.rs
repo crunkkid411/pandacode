@@ -83,7 +83,8 @@ pub(crate) async fn dispatch(app: &tauri::AppHandle, session_id: &str, name: &st
             } else if matches.len() == 1 {
                 matches[0].clone()
             } else if matches.is_empty() {
-                return Err("Choose another bot by its exact name or ID.".into());
+                let names: Vec<&str> = all.iter().filter(|b| b.id != bot.id).map(|b| b.name.as_str()).collect();
+                return Err(format!("No agent is named \"{requested}\". Agents you can message: {}.", if names.is_empty() { "none yet".into() } else { names.join(", ") }));
             } else {
                 return Err("More than one bot has that name. Use its ID.".into());
             }

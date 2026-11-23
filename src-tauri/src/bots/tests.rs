@@ -843,6 +843,16 @@ fn org_chart_place_saves_refuses_loops_and_briefs_the_team() {
     let boss_text = team_text(&f.store, &get(&f.store, &ceo.id).unwrap()).unwrap();
     assert!(boss_text.contains("Editor (Research assistant)") && boss_text.contains("pandacode_bot_message_bot"), "{boss_text}");
     assert!(team_text(&f.store, &get(&f.store, &editor.id).unwrap()).unwrap().contains("You report to Chief"));
+    // A Chief of Staff (coordinator, nobody placed under it) can reach every agent, and hears of new ones.
+    let chief = create(&f.store, &input("Chief of Staff"), &f.root).unwrap();
+    let chief = set_org(&f.store, &chief.id, Org { swarm_role: "coordinator".into(), ..Default::default() }).unwrap();
+    let reach = team_text(&f.store, &chief).unwrap();
+    assert!(reach.contains("Agents you can hand work to") && reach.contains("Editor (Research assistant)") && !reach.contains("Chief of Staff ("), "{reach}");
+    let version = get(&f.store, &chief.id).unwrap().memory_version;
+    create(&f.store, &input("Thumbnail Maker"), &f.root).unwrap();
+    assert!(get(&f.store, &chief.id).unwrap().memory_version > version, "a new agent re-briefs the Chief");
+    assert!(team_text(&f.store, &get(&f.store, &chief.id).unwrap()).unwrap().contains("Thumbnail Maker"));
+    assert!(!team_text(&f.store, &get(&f.store, &editor.id).unwrap()).unwrap().contains("Agents you can hand work to"), "workers get no roster");
     // A profile edit keeps the chart place.
     assert_eq!(update(&f.store, &editor.id, &input("Editor")).unwrap().org.parent_id.as_deref(), Some(ceo.id.as_str()));
 }
