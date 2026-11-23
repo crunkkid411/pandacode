@@ -1028,7 +1028,7 @@ pub(crate) async fn list_model_catalog(provider: &str) -> Result<Vec<ModelInfo>,
         "muse" => muse::models(&path).await,
         "devin" => devin::models(&path).await,
         "zcode" => zcode::models(&path).await,
-        "hermes" => hermes::models(&path).await,
+        "hermes" => hermes::models_with_profiles(&path).await,
         "gemini" | "qwen" | "vibe" => acp_cli::models(provider, &path).await,
         _ => unreachable!(),
     }

@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { BottomSheet } from '../sc/components/shared/bottom-sheet';
 import { call } from '../bridge';
 
-export interface Template { path: string; name: string; description: string; source: string; provider: string }
-export interface TemplateText { name: string; description: string; prompt: string; provider: string }
+export interface Template { path: string; name: string; description: string; source: string; provider: string; model?: string; role?: string }
+export interface TemplateText { name: string; description: string; prompt: string; provider: string; model?: string; role?: string }
 
 interface Props { open: boolean; onClose: () => void; onPick: (t: TemplateText) => void }
 
@@ -16,7 +16,7 @@ export const groupOf = (source: string) => source.split(' · ')[0];
 /** Templates matching the words typed (all words, in name, description or source); Hermes bots and opencompany first. */
 export function filterTemplates(list: Template[], query: string, group: string): Template[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const rank = (t: Template) => (t.source === 'Hermes bot' ? 0 : t.source.startsWith('opencompany') ? 1 : 2);
+  const rank = (t: Template) => (t.source === 'Yours' ? 0 : t.source === 'Hermes bot' ? 1 : t.source === 'MausBot bot' ? 2 : t.source.startsWith('opencompany') ? 3 : 4);
   return list
     .filter(t => group === 'All' || groupOf(t.source) === group)
     .filter(t => { const hay = `${t.name} ${t.description} ${t.source}`.toLowerCase(); return words.every(w => hay.includes(w)); })

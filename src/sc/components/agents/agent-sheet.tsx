@@ -3101,7 +3101,12 @@ export function AgentSheet() {
         setName(t.name)
         setDescription(t.description)
         setSystemPrompt(t.prompt)
-        if (t.provider) setProvider(scProvider(t.provider) as AgentProviderId)
+        const nextProvider = t.provider ? (scProvider(t.provider) as AgentProviderId) : provider
+        // Hub: keep the template's model (a Hermes bot is "profile:<name>") past the provider-change reset.
+        if (t.model && nextProvider !== provider) skipAutoModelRef.current = true
+        if (t.provider) setProvider(nextProvider)
+        if (t.model) setModel(t.model)
+        if (t.role === 'coordinator' || t.role === 'worker') setRole(t.role)
       }}
     />
     </>

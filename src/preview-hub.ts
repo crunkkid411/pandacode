@@ -163,7 +163,8 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
   ] as T;
   if (command === 'hub_agent_templates') return [
-    { path: 'C:/hermes/profiles/scout/SOUL.md', name: 'scout', description: 'You are the Scout', source: 'Hermes bot', provider: 'hermes' },
+    { path: 'C:/hermes/profiles/scout/SOUL.md', name: 'scout', description: 'You are the Scout', source: 'Hermes bot', provider: 'hermes', model: 'profile:scout' },
+    { path: 'X:/AI-2/agent-templates/chief-of-staff.md', name: 'Chief of Staff', description: 'His one point of contact', source: 'Yours', provider: 'claude', role: 'coordinator' },
     { path: 'X:/oc/media_company/agents/writer.toml', name: 'Writer', description: 'Write and edit articles.', source: 'opencompany · media company', provider: '' },
     { path: 'C:/extras/agency-agents/marketing/seo.md', name: 'SEO Specialist', description: 'Ranks pages', source: 'Claude-Extras · agency-agents', provider: '' },
   ] as T;
@@ -171,7 +172,7 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     const all = invokeHub<any[]>('hub_agent_templates', {});
     const t = all.find(x => x.path === args.path);
     if (!t) throw new Error('That template is no longer there.');
-    return { name: t.name, description: t.description, prompt: `Prompt of ${t.name}`, provider: t.provider } as T;
+    return { name: t.name, description: t.description, prompt: `Prompt of ${t.name}`, provider: t.provider, model: t.model ?? '', role: t.role ?? '' } as T;
   }
   if (command === 'usage_ledger') {
     const h = Math.floor(Date.now() / 3600_000);

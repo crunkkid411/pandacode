@@ -2,9 +2,50 @@
 //! model provider configuration remain with the installed Hermes runtime (~/.hermes/).
 use super::*;
 
+/// Jordan's Hermes bots (argus, librarian, ...) are Hermes profiles; the Hub offers each as a
+/// "model" named `profile:<name>`, run as `hermes --profile <name> acp` on the profile's own model.
+pub(crate) const PROFILE_PREFIX: &str = "profile:";
+
+/// The profile a model id names, if it is a valid profile name.
+pub(crate) fn profile_of(model: &str) -> Option<&str> {
+    let name = model.strip_prefix(PROFILE_PREFIX)?;
+    (!name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')).then_some(name)
+}
+
+fn profiles_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|base| Path::new(&base).join("hermes").join("profiles"))
+}
+
+/// One "model" per Hermes profile that has a SOUL.md (a bot he set up).
+pub(crate) fn profile_models() -> Vec<ModelInfo> {
+    let Some(dir) = profiles_dir() else { return Vec::new() };
+    let Ok(read) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut out: Vec<ModelInfo> = read
+        .flatten()
+        .filter(|e| e.path().join("SOUL.md").is_file())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            profile_of(&format!("{PROFILE_PREFIX}{name}"))?;
+            Some(ModelInfo {
+                id: format!("{PROFILE_PREFIX}{name}"),
+                name: format!("{name} (your Hermes bot)"),
+                description: "Runs this Hermes profile with its own soul, skills and model.".into(),
+                reasoning_efforts: Vec::new(),
+                default_reasoning_effort: None,
+                context_window: None,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
+}
+
 pub(super) fn configure(command: &mut Command, config: &RunConfig) {
     if config.mode == "full" {
         command.env("HERMES_YOLO_MODE", "1");
+    }
+    if let Some(profile) = profile_of(&config.model) {
+        command.args(["--profile", profile]);
     }
     let program = command.as_std().get_program().to_os_string();
     configure_command(command, Path::new(&program));
@@ -38,6 +79,13 @@ pub(super) async fn models(path: &Path) -> Result<Vec<ModelInfo>, String> {
     })?;
     acp_catalog::store(discovery, &metadata);
     Ok(acp::parse_models(&metadata))
+}
+
+/// Hermes's own models plus his Hermes bots (profiles).
+pub(super) async fn models_with_profiles(path: &Path) -> Result<Vec<ModelInfo>, String> {
+    let mut list = models(path).await?;
+    list.extend(profile_models());
+    Ok(list)
 }
 
 #[cfg(test)]
@@ -85,6 +133,22 @@ mod tests {
         assert_eq!(models[1].id, "nous/hermes-3-llama-3.1-405b");
         assert_eq!(models[1].name, "Hermes 3 Llama 3.1 405B");
         assert_eq!(models[2].id, "anthropic/claude-sonnet-4");
+    }
+
+    #[test]
+    fn a_hermes_bot_model_runs_its_profile() {
+        let mut cfg = super::super::tests::config("hermes");
+        cfg.model = "profile:scout".into();
+        let mut cmd = Command::new("hermes");
+        configure(&mut cmd, &cfg);
+        assert_eq!(cmd.as_std().get_args().collect::<Vec<_>>(), ["--profile", "scout", "acp"]);
+        cfg.model = "default".into();
+        let mut plain = Command::new("hermes");
+        configure(&mut plain, &cfg);
+        assert_eq!(plain.as_std().get_args().collect::<Vec<_>>(), ["acp"]);
+        assert_eq!(profile_of("profile:a b"), None);
+        assert_eq!(profile_of("profile:../x"), None);
+        assert_eq!(profile_of("gpt-6"), None);
     }
 
     #[test]

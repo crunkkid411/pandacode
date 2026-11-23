@@ -847,7 +847,8 @@ impl Protocol {
         if self.config.provider == "devin" && !self.image_blocks.is_empty() && super::devin::rejects_images(&self.acp_config, &self.config.model) {
             return Err("This Devin model does not accept images. Choose another model, or remove the images and describe them.".into());
         }
-        if self.config.model.is_empty() || self.config.model == "default" {
+        // A Hermes bot (`profile:<name>`) runs on the profile's own model: nothing to switch.
+        if self.config.model.is_empty() || self.config.model == "default" || (self.config.provider == "hermes" && super::hermes::profile_of(&self.config.model).is_some()) {
             return self.acp_effort(step);
         }
         if let Some(option) = options(&self.acp_config, "model") {

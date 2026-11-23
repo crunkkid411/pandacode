@@ -111,7 +111,7 @@ test('agents: Start from a template fills the form; a Hermes bot template makes 
   await open(page, '/agents/b1');
   await page.getByRole('button', { name: 'Agent', exact: true }).click();
   await page.getByRole('button', { name: 'Start from a template' }).click();
-  await expect(page.getByText('3 agent templates on this PC', { exact: false })).toBeVisible();
+  await expect(page.getByText('4 agent templates on this PC', { exact: false })).toBeVisible();
   await page.getByPlaceholder(/Search: writer/).fill('scout');
   await expect(page.getByText('Writer', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /scout/ }).click();
@@ -119,7 +119,18 @@ test('agents: Start from a template fills the form; a Hermes bot template makes 
   await expect(page.getByPlaceholder('What does this agent do?')).toHaveValue('You are the Scout');
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-template.png`, fullPage: true });
   await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
-  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.provider, c.args.input.instructions])).toEqual([['scout', 'hermes', 'Prompt of scout']]);
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.provider, c.args.input.model, c.args.input.instructions])).toEqual([['scout', 'hermes', 'profile:scout', 'Prompt of scout']]);
+});
+
+test('agents: the Chief of Staff template makes a Claude Code coordinator', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Start from a template' }).click();
+  await page.getByRole('button', { name: /Chief of Staff/ }).click();
+  await expect(page.getByPlaceholder('e.g. SEO Researcher')).toHaveValue('Chief of Staff');
+  await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.provider])).toEqual([['Chief of Staff', 'claude']]);
+  await expect.poll(async () => (await calls(page, 'bot_set_org')).map(c => c.args.org.swarmRole)).toEqual(['coordinator']);
 });
 
 test('agents: the skills list shows the ones made for him before anything is typed', async ({ page }) => {
