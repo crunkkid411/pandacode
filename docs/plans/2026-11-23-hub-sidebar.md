@@ -27,6 +27,10 @@ C. Pages (each with real data)
 - [x] Inbox = SwarmClaw's idea, for Jordan: agents waiting on him, failures, replies he hasn't read (Ctrl/Shift select, Mark read, Open chat). Jordan, 2026-11-23: "inbox.txt is not the same functionality as swarmclaws inbox ... use swarmclaws idea of inbox - the gui is for me, the user"
 - [x] Extensions <- inbox.txt (add link, open link, Install them now); moved out of Inbox
 - [x] Mascots: Claude Code = Clawd ("Claw'd the mascot, not the company logo"); OpenRouter and Liquid AI added, picked by the model
-- [ ] Projects, Sessions/Runs, Memory, Activity
-- [ ] MCP servers, Extensions (plugins), Connectors, Webhooks
-- [ ] Chatrooms, Knowledge (qmd), Missions, Quality, Feed
+- [x] Gray layers instead of the purple tint (rail, side panel, page, cards each a different gray), white text, glow on hover/focus
+- [x] New-agent form: harness cards with logo, mascot and brand color; mascot preview; white 14px labels
+- [x] Projects, Sessions (SwarmClaw's "Runs"), Memory (agents' memory files), Activity (agent logs + chat states)
+- [x] MCP servers and plugins (per harness), Connectors (agent chat links: web chat, Telegram, Discord, Slack, WhatsApp)
+- [x] Chatrooms (= PandaCode bot group chats), Knowledge (qmd library search)
+- [x] Ctrl/Shift multi-select on Sessions, Inbox, Task board, Agents list
+- [ ] Not built, nothing in PandaCode behind them: Webhooks (only used inside WhatsApp links), Missions (budgeted goals with milestones), Quality (eval suites), Feed (SwarmClaw's social feed). Build only if Jordan asks.
