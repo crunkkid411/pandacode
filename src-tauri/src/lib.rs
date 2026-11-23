@@ -7,6 +7,7 @@ mod hub_org;
 mod hub_skills;
 mod hub_templates;
 mod hub_inbox;
+mod hub_memory;
 mod hub_lists;
 mod hub_tts;
 mod hub_tools;
@@ -4156,6 +4157,8 @@ pub fn run() {
                     // Inbox: which agent replies Jordan has read.
                     hub_inbox::hub_inbox_seen,
                     hub_inbox::hub_inbox_mark_read,
+                    hub_memory::hub_memory_list,
+                    hub_memory::hub_memory_read,
                     // Chat box: "+" pictures, "/" commands, the model menu and /rename.
                     import_prompt_image,
                     list_slash_commands,

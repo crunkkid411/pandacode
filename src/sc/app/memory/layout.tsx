@@ -1,21 +1,9 @@
 'use client'
 
-import { SidebarPanelShell } from '@/components/layout/sidebar-panel-shell'
 import { MainContent } from '@/components/layout/main-content'
-import { MemoryAgentList } from '@/components/memory/memory-agent-list'
-import { useAppStore } from '@/stores/use-app-store'
 
+// Hub: no side list. SwarmClaw's memory store needs its own server; the page shows what Jordan's
+// agents saved in their own memory files (src/sc-hub/memory-page.tsx).
 export default function MemoryLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <SidebarPanelShell
-        title="Memory"
-        createLabel="Memory"
-        onNew={() => useAppStore.getState().setMemorySheetOpen(true)}
-      >
-        <MemoryAgentList />
-      </SidebarPanelShell>
-      <MainContent>{children}</MainContent>
-    </>
-  )
+  return <MainContent>{children}</MainContent>
 }

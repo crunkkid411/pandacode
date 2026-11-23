@@ -487,3 +487,21 @@ test('mcp servers and plugins: what each harness has set up, grouped under its l
   await expect(plugins.getByText('superpowers', { exact: true })).toHaveCount(0);
   await expect(plugins.getByText('ponytail', { exact: true })).toBeVisible();
 });
+
+test('memory: what the agents remember, by where it applies and by kind (color and word); open one to read it', async ({ page }) => {
+  await open(page, '/memory');
+  await expect(page.getByRole('heading', { name: 'Memory', exact: true })).toBeVisible();
+  const list = page.getByRole('region', { name: 'Memories' });
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await page.getByRole('region', { name: 'Where' }).getByRole('button', { name: /Everywhere/ }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('region', { name: 'Where' }).getByRole('button', { name: /All memories/ }).click();
+  await page.getByRole('button', { name: 'Your correction', exact: true }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await list.getByRole('button', { name: /no-telegram/ }).click();
+  await expect(page.getByRole('region', { name: 'Memory', exact: true })).toContainText('The memory text for C:/m/no-telegram.md.');
+  await expect(page.getByRole('region', { name: 'Memory', exact: true })).not.toContainText('name: x');
+  await page.getByRole('button', { name: 'Open the file' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_open_path')).map(c => c.args.path)).toEqual(['C:/m/no-telegram.md']);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-memory.png`, fullPage: true });
+});

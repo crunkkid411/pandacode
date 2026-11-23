@@ -461,6 +461,10 @@ export const routes: Route[] = [
   { method: 'POST', path: /^\/hub-installs\/open$/, run: async ({ call, body }) => { await call('hub_open_link', { url: (body as { url?: string })?.url ?? '' }); return { ok: true }; } },
   // Inbox: agent replies Jordan hasn't read, agents waiting on him, failures (inbox-facts.ts).
   { method: 'GET', path: /^\/hub-inbox$/, run: ({ call }) => hubInbox(call) },
+  // Memory: what the agents saved in their own memory files (hub_memory.rs). Read only.
+  { method: 'GET', path: /^\/hub-memory$/, run: ({ call }) => call('hub_memory_list') },
+  { method: 'POST', path: /^\/hub-memory\/read$/, run: ({ call, body }) => call('hub_memory_read', { path: ((body ?? {}) as { path?: string }).path ?? '' }) },
+  { method: 'POST', path: /^\/hub-memory\/open$/, run: async ({ call, body }) => { await call('hub_open_path', { path: ((body ?? {}) as { path?: string }).path ?? '', folder: false }); return { ok: true }; } },
   // Sessions and Projects (sessions-facts.ts). Stop works on the whole selection.
   { method: 'GET', path: /^\/hub-sessions$/, run: ({ call }) => hubSessions(call) },
   { method: 'POST', path: /^\/hub-sessions\/stop$/, run: async ({ call, body }) => {
