@@ -1,5 +1,5 @@
 'use client'
-import { HUB_VIEWS } from '../../../sc-hub/views'
+import { HUB_VIEWS, sectionColor } from '../../../sc-hub/views'
 
 import Link from 'next/link'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -18,6 +18,8 @@ export function NavItem({ view, label, expanded, isActive, onClick, badge, child
 }) {
   if (!HUB_VIEWS.has(view)) return null // Hub: hide pages with no data behind them
   const href = getViewPath(view)
+  // Hub: every section has its own color (icon always, tinted background when open)
+  const sec = { '--sec': sectionColor(view) } as React.CSSProperties
 
   if (expanded) {
     return (
@@ -26,11 +28,11 @@ export function NavItem({ view, label, expanded, isActive, onClick, badge, child
         onClick={onClick}
         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-500 cursor-pointer transition-all border-none no-underline
           ${isActive
-            ? 'bg-accent-soft text-accent-bright'
-            : 'bg-transparent text-text-3 hover:text-text hover:bg-white/[0.04]'}`}
-        style={{ fontFamily: 'inherit' }}
+            ? 'bg-[color-mix(in_srgb,var(--sec)_18%,transparent)] text-text shadow-[inset_3px_0_0_var(--sec)]'
+            : 'bg-transparent text-text-2 hover:text-text hover:bg-[color-mix(in_srgb,var(--sec)_8%,transparent)]'}`}
+        style={{ fontFamily: 'inherit', ...sec }}
       >
-        <span className="shrink-0 relative">
+        <span className="shrink-0 relative text-[var(--sec)]">
           {children}
           {!!badge && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-amber-500 text-black text-[9px] font-700 flex items-center justify-center px-0.5">
@@ -46,7 +48,7 @@ export function NavItem({ view, label, expanded, isActive, onClick, badge, child
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link href={href} onClick={onClick} className={`rail-btn ${isActive ? 'active' : ''} relative no-underline`}>
+        <Link href={href} onClick={onClick} style={sec} className={`rail-btn ${isActive ? 'active bg-[color-mix(in_srgb,var(--sec)_18%,transparent)]!' : ''} text-[var(--sec)]! relative no-underline`}>
           {children}
           {!!badge && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-amber-500 text-black text-[9px] font-700 flex items-center justify-center px-0.5">

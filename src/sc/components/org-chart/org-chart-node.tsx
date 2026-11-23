@@ -40,6 +40,8 @@ function truncateModel(model: string | undefined | null): string | null {
   return name.length > 24 ? name.slice(0, 22) + '…' : name
 }
 
+import { HarnessLogo } from '../../../sc-hub/harness-logo'
+
 export function OrgChartNode({
   agent,
   isRunning,
@@ -190,7 +192,7 @@ export function OrgChartNode({
             <span className="text-[9px] font-500 text-text-3/60 px-1 py-0.5 rounded-[4px] bg-white/[0.04] leading-none">+{childCount}</span>
           )}
           {providerLabel && (
-            <span className="text-[9px] text-text-3/40 px-1 py-0.5 leading-none">{providerLabel}</span>
+            <HarnessLogo provider={providerLabel} size={14} className="ml-0.5" />
           )}
         </div>
 

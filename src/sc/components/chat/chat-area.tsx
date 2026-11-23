@@ -48,6 +48,8 @@ const AGENT_PROMPT_SUGGESTIONS = [
   { text: 'Help me map the next best step', icon: 'bot', gradient: 'from-[#34D399]/10 to-[#6EE7B7]/5' },
 ]
 
+import { agentColorStyle } from '../../../sc-hub/mascots'
+
 export function ChatArea() {
   const session = useAppStore((s) => {
     const id = selectActiveSessionId(s)
@@ -583,7 +585,7 @@ export function ChatArea() {
   const isEmpty = !messages.length && !streamingForThisSession && !messagesLoading
 
   return (
-    <div className="flex-1 flex h-full min-h-0 min-w-0">
+    <div className="flex-1 flex h-full min-h-0 min-w-0" style={agentColorStyle(currentAgent?.avatarSeed)}>
     <div
       data-testid="chat-area"
       className="flex-1 flex flex-col h-full min-h-0 min-w-0 relative"

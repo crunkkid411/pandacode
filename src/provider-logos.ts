@@ -25,6 +25,13 @@ const logos: Partial<Record<ProviderId, string>> = {
   hermes: new URL('./assets/providers/hermes.svg', import.meta.url).href,
 };
 
+/** The provider mark as an image address (the Hub shows logos as pictures); null when there is none. */
+export function providerLogoUrl(id: ProviderId): string | null {
+  const svg = id === 'github-copilot' ? githubCopilotLogo : id === 'cline' ? clineLogo : id === 'devin' ? devinLogo : id === 'kilo' ? kiloLogo : id === 'zcode' ? zcodeLogo : '';
+  if (svg) return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return logos[id] ?? null;
+}
+
 /** Decorative provider mark. The surrounding control supplies its accessible name. */
 export function providerLogo(id: ProviderId, cls = ''): string {
   const className = `provider-logo${cls ? ` ${escape(cls)}` : ''}`;

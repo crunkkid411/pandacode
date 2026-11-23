@@ -173,6 +173,25 @@ test('chat box: "@" lists agents; a tagged agent gets the message in its own cha
   ]);
 });
 
+test('look: Agents shows every agent as a card with its harness mascot and logo; a card opens its chat', async ({ page }) => {
+  await open(page, '/agents');
+  const card = page.getByRole('group', { name: 'All agents' }).getByRole('button', { name: /Chief of Staff/ }).filter({ has: page.getByRole('img', { name: 'Claude Code' }) });
+  await expect(card).toBeVisible();
+  // Claude Code agents are orange (the mascot carries the color), OpenCode ones are slate.
+  const faces = await page.getByRole('group', { name: 'All agents' }).locator('img[src^="data:image/svg+xml"]').evaluateAll(imgs => imgs.map(i => decodeURIComponent((i as HTMLImageElement).src)));
+  expect(faces.some(f => /fill="#[cd][0-9a-f]7[0-9a-f]{3}"/.test(f) && f.includes('rotate(45 32 15)'))).toBe(true); // orange body + Claude starburst
+  await card.click();
+  await expect(page).toHaveURL(/#\/agents\/b1$/);
+});
+
+test('look: each agent chat wears its agent color; org chart cards show harness logos, not "claude-cli"', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await expect.poll(() => page.locator('[style*="--agent-color"]').first().getAttribute('style')).toMatch(/--agent-color: #[0-9a-f]{6}/);
+  await open(page, '/org-chart');
+  await expect(page.getByRole('img', { name: 'Claude Code' }).first()).toBeVisible();
+  await expect(page.getByText('claude-cli', { exact: true })).toHaveCount(0);
+});
+
 test('agents: SwarmClaw layout with Chat and Config tabs and + Agent; pin sticks after reload', async ({ page }) => {
   await open(page, '/agents/b1');
   for (const tab of ['chat', 'config']) await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();

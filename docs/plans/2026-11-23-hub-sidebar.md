@@ -17,10 +17,10 @@ A. Chat box
 - [x] @name tags another agent: it gets the message too
 
 B. Look
-- [ ] colors as tokens in one place (murmur-like: distinct per section and per agent)
-- [ ] agent faces: one mascot per harness in its logo color, role tool where it fits
-- [ ] agent picker as cards (face, name, short description)
-- [ ] real logos instead of harness names
+- [x] colors as tokens in one place (murmur-like: distinct per section and per agent)
+- [x] agent faces: one mascot per harness in its logo color, role tool where it fits
+- [x] agent picker as cards (face, name, short description)
+- [x] real logos instead of harness names
 
 C. Pages (each with real data)
 - [ ] Task Board <- JOBS.md

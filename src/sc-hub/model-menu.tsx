@@ -5,8 +5,9 @@ import { toast } from 'sonner';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
 } from '../sc/components/ui/dropdown-menu';
+import { HarnessLogo } from './harness-logo';
 
-interface Models { current: string; models: { id: string; name: string }[] }
+interface Models { provider?: string; current: string; models: { id: string; name: string }[] }
 
 async function asJson<T>(res: Response): Promise<T> {
   const body = await res.json();
@@ -38,7 +39,8 @@ export function ModelMenu({ sessionId }: { sessionId: string | null }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-label="Change model" title="Change model"
-          className="flex items-center gap-1 px-2.5 py-2 rounded-[10px] border-none bg-transparent text-text-3 text-[13px] cursor-pointer hover:text-text-2 hover:bg-white/[0.05] max-w-[240px]">
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-[10px] border-none bg-transparent text-text-3 text-[13px] cursor-pointer hover:text-text-2 hover:bg-white/[0.05] max-w-[240px]">
+          {data.provider ? <HarnessLogo provider={data.provider} size={15} /> : null}
           <span className="truncate">{label}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
         </button>

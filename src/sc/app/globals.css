@@ -50,19 +50,19 @@
 
   /* ===== Midnight Glass Palette ===== */
   /* Surfaces derived from --neutral-tint for single-knob theming */
-  --color-bg: color-mix(in srgb, var(--neutral-tint, #1e1e30) 40%, #000);
-  --color-raised: color-mix(in srgb, var(--neutral-tint, #1e1e30) 50%, #000);
-  --color-surface: color-mix(in srgb, var(--neutral-tint, #1e1e30) 65%, #000);
-  --color-surface-2: var(--neutral-tint, #1e1e30);
-  --color-surface-3: color-mix(in srgb, var(--neutral-tint, #1e1e30) 80%, #333);
-  --color-border-hi: rgba(255,255,255,0.07);
-  --color-border-focus: rgba(99,102,241,0.5);
+  --color-bg: color-mix(in srgb, var(--neutral-tint, #241d2b) 40%, #000);
+  --color-raised: color-mix(in srgb, var(--neutral-tint, #241d2b) 50%, #000);
+  --color-surface: color-mix(in srgb, var(--neutral-tint, #241d2b) 65%, #000);
+  --color-surface-2: var(--neutral-tint, #241d2b);
+  --color-surface-3: color-mix(in srgb, var(--neutral-tint, #241d2b) 80%, #333);
+  --color-border-hi: rgba(255,255,255,0.11);
+  --color-border-focus: rgba(124,124,246,0.5);
   --color-text: #e2e2ec;
-  --color-text-2: #a0a0ba;
-  --color-text-3: #8282a0;
-  --color-accent-soft: rgba(99,102,241,0.08);
-  --color-accent-glow: rgba(99,102,241,0.18);
-  --color-accent-bright: #818CF8;
+  --color-text-2: #c4bfd1;
+  --color-text-3: #a39db2;
+  --color-accent-soft: rgba(124,124,246,0.08);
+  --color-accent-glow: rgba(124,124,246,0.18);
+  --color-accent-bright: #A5A6FF;
   --color-user-text: #fff;
   --color-success: #34D399;
   --color-success-soft: rgba(52,211,153,0.08);
@@ -70,7 +70,7 @@
   --color-danger-soft: rgba(244,63,94,0.08);
   --color-shereen: #EC4899;
   --color-user-bubble: #4338CA;
-  --color-user-bubble-2: #6366F1;
+  --color-user-bubble-2: #7C7CF6;
   --color-ai-bubble: #12121e;
   --color-glass: rgba(16,16,28,0.75);
   --color-glass-border: rgba(255,255,255,0.05);
@@ -80,6 +80,11 @@
 }
 
 :root {
+  /* Hub: one color per sidebar section (src/sc-hub/views.ts sectionColor). Agent colors: src/sc-hub/mascots.ts. */
+  --hub-workspace: #9b9cff;
+  --hub-execution: #f5b041;
+  --hub-knowledge: #34d6bd;
+  --hub-system: #7fb2f0;
   --font-dm-sans: 'Segoe UI';
   --font-sora: 'Segoe UI';
   --font-jetbrains-mono: 'SF Mono';
@@ -87,33 +92,33 @@
 
   /* ===== Single-Tint Theming ===== */
   /* Change this one value to shift the entire palette hue */
-  --neutral-tint: #1e1e30;
+  --neutral-tint: #241d2b;
   --background: color-mix(in srgb, var(--neutral-tint) 40%, #000);
   --foreground: #e2e2ec;
   --card: color-mix(in srgb, var(--neutral-tint) 50%, #000);
   --card-foreground: #e2e2ec;
   --popover: color-mix(in srgb, var(--neutral-tint) 50%, #000);
   --popover-foreground: #e2e2ec;
-  --primary: #6366F1;
+  --primary: #7C7CF6;
   --primary-foreground: #ffffff;
   --secondary: color-mix(in srgb, var(--neutral-tint) 65%, #000);
   --secondary-foreground: #e2e2ec;
   --muted: color-mix(in srgb, var(--neutral-tint) 65%, #000);
-  --muted-foreground: #a0a0ba;
-  --accent: #6366F1;
+  --muted-foreground: #c4bfd1;
+  --accent: #7C7CF6;
   --accent-foreground: #ffffff;
   --destructive: #F43F5E;
-  --border: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.08);
   --input: rgba(255,255,255,0.04);
-  --ring: rgba(99,102,241,0.4);
+  --ring: rgba(124,124,246,0.4);
   --sidebar: color-mix(in srgb, var(--neutral-tint) 50%, #000);
   --sidebar-foreground: #e2e2ec;
-  --sidebar-primary: #6366F1;
+  --sidebar-primary: #7C7CF6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(99,102,241,0.08);
+  --sidebar-accent: rgba(124,124,246,0.08);
   --sidebar-accent-foreground: #e2e2ec;
-  --sidebar-border: rgba(255,255,255,0.04);
-  --sidebar-ring: rgba(99,102,241,0.4);
+  --sidebar-border: rgba(255,255,255,0.08);
+  --sidebar-ring: rgba(124,124,246,0.4);
 
   /* ===== Status Badge System ===== */
   --status-idle-bg: rgba(255,255,255,0.04);
@@ -353,7 +358,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 }
 
 /* Selection */
-::selection { background: rgba(99,102,241,0.3); }
+::selection { background: rgba(124,124,246,0.3); }
 
 /* ===== Animations ===== */
 @keyframes msg-in {
@@ -549,7 +554,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 
 /* AI avatar mood animations */
 @keyframes ai-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-@keyframes ai-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); } 50% { box-shadow: 0 0 12px 4px rgba(99,102,241,0.35); } }
+@keyframes ai-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(124,124,246,0); } 50% { box-shadow: 0 0 12px 4px rgba(124,124,246,0.35); } }
 @keyframes ai-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
 @keyframes ai-bounce { 0%,100% { transform: scale(1); } 40% { transform: scale(1.25); } 60% { transform: scale(0.95); } }
 
@@ -585,7 +590,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 }
 
 .msg-content :not(pre) > code {
-  background: rgba(99,102,241,0.08);
+  background: rgba(124,124,246,0.08);
   padding: 2px 7px;
   border-radius: 5px;
   font-size: 0.87em;
@@ -617,7 +622,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 .msg-content a {
   color: var(--color-accent-bright);
   text-decoration: none;
-  border-bottom: 1px solid rgba(99,102,241,0.3);
+  border-bottom: 1px solid rgba(124,124,246,0.3);
   transition: border-color 0.15s;
 }
 .msg-content a:hover { border-color: var(--color-accent-bright); }
@@ -654,7 +659,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 /* Focus glow */
 .focus-glow:focus-within {
   border-color: var(--color-border-focus) !important;
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.06);
+  box-shadow: 0 0 0 3px rgba(124,124,246,0.06);
 }
 
 /* Glass effect */
@@ -683,15 +688,17 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
 .rail-btn.active { background: var(--color-accent-soft); color: var(--color-accent-bright); }
 
 /* Message bubble styles */
+/* Hub (murmur look): your message wears the color of the agent you are talking to.
+   --agent-color is set on the chat by src/sc/components/chat/chat-area.tsx; lavender when no agent. */
 .bubble-user {
-  background: linear-gradient(135deg, var(--color-user-bubble) 0%, var(--color-user-bubble-2) 100%);
+  background: color-mix(in srgb, var(--agent-color, #7C7CF6) 30%, #17121c);
+  border: 1px solid color-mix(in srgb, var(--agent-color, #7C7CF6) 45%, transparent);
   border-radius: 20px 20px 6px 20px;
   color: white;
-  box-shadow: 0 2px 16px rgba(99,102,241,0.15);
 }
 
 .bubble-ai {
-  background: #1c1c2e;
+  background: #1d1823;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px 20px 20px 6px;
 }
@@ -706,13 +713,13 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(129,140,248,0.02));
+  background: linear-gradient(135deg, rgba(124,124,246,0.06), rgba(129,140,248,0.02));
   opacity: 0;
   transition: opacity 0.25s;
 }
 .suggestion-card:hover::before { opacity: 1; }
 .suggestion-card:hover {
-  border-color: rgba(99,102,241,0.2);
+  border-color: rgba(124,124,246,0.2);
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
@@ -759,7 +766,7 @@ textarea:hover::-webkit-scrollbar { width: 6px; }
   left: 0; top: 0.7rem; bottom: 0.7rem;
   width: 4px;
   border-radius: 0 9999px 9999px 0;
-  background: linear-gradient(180deg, #818CF8 0%, #6366F1 50%, #4F46E5 100%);
+  background: linear-gradient(180deg, #A5A6FF 0%, #7C7CF6 50%, #4F46E5 100%);
 }
 
 /* ===== Command Surface ===== */

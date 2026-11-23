@@ -330,7 +330,7 @@ export const routes: Route[] = [
     if (!c) throw new Error('That chat no longer exists in PandaCode.');
     const bot = (await listBots(call)).find(b => b.desktopSession === c.id);
     const models = await call<{ id: string; name: string }[]>('list_provider_models', { provider: c.provider, force: false });
-    return { current: bot?.model ?? c.model, models: models.map(m => ({ id: m.id, name: m.name || m.id })) };
+    return { provider: c.provider, current: bot?.model ?? c.model, models: models.map(m => ({ id: m.id, name: m.name || m.id })) };
   } },
   { method: 'PUT', path: /^\/chats\/([^/]+)\/model$/, run: async ({ call, match, body }) => {
     const model = String((body as { model?: string } | null)?.model ?? '');

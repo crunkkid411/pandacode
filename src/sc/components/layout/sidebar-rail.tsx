@@ -214,7 +214,7 @@ export function SidebarRail({
           <div className={`flex flex-col gap-0.5 ${railExpanded ? '' : 'items-center'}`}>
             {/* Hub: title only when its section shows a page */}
             {!hubSectionShown(['home','agents','org_chart','inbox','chatrooms','protocols','projects','swarmfeed','marketplace']) ? null : railExpanded ? (
-              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-text-3/45">Workspace</div>
+              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-[var(--hub-workspace)]">Workspace</div>
             ) : (
               <div className="my-1 h-px w-6 bg-white/[0.06]" />
             )}
@@ -276,7 +276,7 @@ export function SidebarRail({
           <div className={`flex flex-col gap-0.5 ${railExpanded ? '' : 'items-center'}`}>
             {/* Hub: title only when its section shows a page */}
             {!hubSectionShown(['tasks','missions','schedules','memory','runs','quality']) ? null : railExpanded ? (
-              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-text-3/45">Execution</div>
+              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-[var(--hub-execution)]">Execution</div>
             ) : (
               <div className="my-1 h-px w-6 bg-white/[0.06]" />
             )}
@@ -320,7 +320,7 @@ export function SidebarRail({
           <div className={`flex flex-col gap-0.5 ${railExpanded ? '' : 'items-center'}`}>
             {/* Hub: title only when its section shows a page */}
             {!hubSectionShown(['knowledge','skills','connectors','webhooks','mcp_servers','extensions']) ? null : railExpanded ? (
-              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-text-3/45">Knowledge</div>
+              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-[var(--hub-knowledge)]">Knowledge</div>
             ) : (
               <div className="my-1 h-px w-6 bg-white/[0.06]" />
             )}
@@ -361,7 +361,7 @@ export function SidebarRail({
           <div className={`flex flex-col gap-0.5 ${railExpanded ? '' : 'items-center'}`}>
             {/* Hub: title only when its section shows a page */}
             {!hubSectionShown(['secrets','wallets','providers','usage','activity','autonomy','logs']) ? null : railExpanded ? (
-              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-text-3/45">System</div>
+              <div className="px-3 pb-1 text-[10px] font-700 uppercase tracking-[0.12em] text-[var(--hub-system)]">System</div>
             ) : (
               <div className="my-1 h-px w-6 bg-white/[0.06]" />
             )}

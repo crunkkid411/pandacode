@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BottomSheet } from '../sc/components/shared/bottom-sheet';
 import { call } from '../bridge';
+import { AgentPickCard } from './agent-pick-card';
+import { mascotSeed, toolFor } from './mascots';
 
 export interface Template { path: string; name: string; description: string; source: string; provider: string; model?: string; role?: string }
 export interface TemplateText { name: string; description: string; prompt: string; provider: string; model?: string; role?: string }
@@ -65,18 +67,16 @@ export function AgentTemplatePicker({ open, onClose, onPick }: Props) {
         ))}
       </div>
       {error && <p className="mb-3 text-[13px] text-red-400">{error}</p>}
-      <div className="flex flex-col gap-2 overflow-y-auto max-h-[55vh] pr-1">
-        {shown.slice(0, 200).map(t => (
-          <button key={t.path} onClick={() => pick(t)} disabled={!!busy} title={t.path}
-            className="text-left px-4 py-3 rounded-[12px] border border-white/[0.06] bg-surface hover:border-accent-bright/30 hover:bg-white/[0.03] transition-all cursor-pointer disabled:opacity-60">
-            <div className="flex items-center gap-2">
-              <span className="text-[14px] font-600 text-text">{t.name}</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-[999px] bg-white/[0.05] text-text-3">{t.source}</span>
-              {busy === t.path && <span className="text-[11px] text-accent-bright">Loading…</span>}
-            </div>
-            {t.description && <p className="mt-1 text-[12px] text-text-3 line-clamp-2">{t.description}</p>}
-          </button>
-        ))}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 overflow-y-auto max-h-[55vh] pr-1">
+        {shown.slice(0, 200).map(t => {
+          // A template's face: the mascot of the harness it will run on (Claude Code when it names none).
+          const harness = t.provider || 'claude';
+          return (
+            <AgentPickCard key={t.path} name={t.name} description={t.description} provider={harness} title={t.path}
+              seed={mascotSeed(harness, t.path, '', null, toolFor(`${t.name} ${t.description}`, t.role === 'coordinator'))}
+              note={busy === t.path ? 'Loading…' : t.source} busy={!!busy} onPick={() => { void pick(t); }} />
+          );
+        })}
         {list && shown.length === 0 && <p className="text-[13px] text-text-3">No template matches. Try fewer words.</p>}
         {shown.length > 200 && <p className="text-[12px] text-text-3/70">Showing 200 of {shown.length}. Type to narrow it down.</p>}
       </div>

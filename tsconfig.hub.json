@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"baseUrl":".","paths":{"@/*":["src/sc/*"],"next/*":["src/sc-hub/shims/next-*"]}},"include":["src/sc-hub/**/*.ts","src/sc-hub/**/*.tsx","src/sc/**/*.ts","src/sc/**/*.tsx","src/*.d.ts"],"exclude":[]}

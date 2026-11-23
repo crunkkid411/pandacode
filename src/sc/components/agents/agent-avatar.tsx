@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import multiavatar from '@multiavatar/multiavatar'
 import DOMPurify from 'dompurify'
+import { mascotSvg } from '../../../sc-hub/mascots'
 
 // The browser DOMPurify package runs client-side only; this component is a
 // 'use client' boundary so sanitizeSvg only executes after hydration where
@@ -34,6 +35,8 @@ const HEART_PATH = 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7
 export function AgentAvatar({ seed, avatarUrl, name, size = 32, className = '', status, heartbeatPulse }: Props) {
   const svgHtml = useMemo(() => {
     if (!seed) return null
+    // Hub: agents are drawn as their harness mascot (src/sc-hub/mascots.ts)
+    if (seed.startsWith('mascot|')) return mascotSvg(seed) || null
     return sanitizeSvg(multiavatar(seed))
   }, [seed])
 
@@ -78,7 +81,7 @@ export function AgentAvatar({ seed, avatarUrl, name, size = 32, className = '', 
     return (
       <div className={`relative shrink-0 ${className}`} style={{ width: size, height: size }}>
         {/* Hub: shown as a picture, so the SVG can never run code */}
-        <img alt="" className="rounded-full overflow-hidden w-full h-full" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgHtml)}`} />
+        <img alt="" className={`${seed?.startsWith('mascot|') ? '' : 'rounded-full overflow-hidden '}w-full h-full`} draggable={false} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgHtml)}`} />
         {heartEl}
         {dot}
       </div>

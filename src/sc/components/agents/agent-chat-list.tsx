@@ -23,6 +23,7 @@ interface Props {
   onSelect?: () => void
 }
 
+
 export function AgentChatList({ inSidebar, onSelect }: Props) {
   const mountedRef = useMountedRef()
   const navigateTo = useNavigate()
@@ -453,7 +454,7 @@ export function AgentChatList({ inSidebar, onSelect }: Props) {
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-display text-[13.5px] font-600 truncate flex-1 tracking-[-0.01em]">
+                    <span className="font-display text-[13.5px] font-600 truncate flex-1 min-w-[50%] tracking-[-0.01em]">
                       {agent.name}
                     </span>
                     {isDisabled && (
