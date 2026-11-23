@@ -465,6 +465,13 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/hub-memory$/, run: ({ call }) => call('hub_memory_list') },
   { method: 'POST', path: /^\/hub-memory\/read$/, run: ({ call, body }) => call('hub_memory_read', { path: ((body ?? {}) as { path?: string }).path ?? '' }) },
   { method: 'POST', path: /^\/hub-memory\/open$/, run: async ({ call, body }) => { await call('hub_open_path', { path: ((body ?? {}) as { path?: string }).path ?? '', folder: false }); return { ok: true }; } },
+  // Knowledge: his qmd library (hub_knowledge.rs).
+  { method: 'GET', path: /^\/hub-knowledge$/, run: ({ call }) => call('hub_knowledge_collections') },
+  { method: 'POST', path: /^\/hub-knowledge\/search$/, run: ({ call, body }) => {
+    const b = (body ?? {}) as { query?: string; collection?: string };
+    return call('hub_knowledge_search', { query: b.query ?? '', collection: b.collection || null });
+  } },
+  { method: 'POST', path: /^\/hub-knowledge\/get$/, run: ({ call, body }) => call('hub_knowledge_get', { file: ((body ?? {}) as { file?: string }).file ?? '' }) },
   // Sessions and Projects (sessions-facts.ts). Stop works on the whole selection.
   { method: 'GET', path: /^\/hub-sessions$/, run: ({ call }) => hubSessions(call) },
   { method: 'POST', path: /^\/hub-sessions\/stop$/, run: async ({ call, body }) => {

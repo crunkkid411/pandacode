@@ -231,6 +231,12 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { scope: 'X:\\AI-2', path: 'C:/m/no-telegram.md', name: 'no-telegram-no-multiple-choice', description: 'He does not use Telegram; ask in plain words', kind: 'feedback', modified: now - 3_600_000 },
     { scope: 'X:\\AI-2', path: 'C:/m/iphone.md', name: 'jordan-devices', description: 'iPhone 13 Pro', kind: 'user', modified: now - 7_200_000 },
   ] as T;
+  if (command === 'hub_knowledge_collections') return [{ name: 'youtube-notes', files: 1048, updated: '15h ago' }, { name: 'github-stars', files: 1022, updated: '1d ago' }] as T;
+  if (command === 'hub_knowledge_search') return [
+    { docid: '#1', score: 0.9, file: 'qmd://youtube-notes/cooling.md', title: 'Laptop cooling video', snippet: '@@ -1,3 @@\n---\ntitle: x\nFans and heat' },
+    { docid: '#2', score: 0.8, file: 'qmd://github-stars/fan.md', title: 'fan-control repo', snippet: 'Controls fans' },
+  ].filter(h => !args.collection || h.file.includes(`//${args.collection}/`)) as T;
+  if (command === 'hub_knowledge_get') return `Full text of ${args.file}` as T;
   if (command === 'hub_memory_read') return `---\nname: x\n---\nThe memory text for ${args.path}.` as T;
   if (command === 'bot_set_work_project') { const b = botById(args.botId); b.workProject = args.projectId ?? ''; return { ...b } as T; }
   if (command === 'bot_detail' || command.startsWith('bot_schedule_') || command === 'bot_run_schedule_now') return invokeBotSchedules(command, args) as T;

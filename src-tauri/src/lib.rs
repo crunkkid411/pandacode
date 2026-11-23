@@ -7,6 +7,7 @@ mod hub_org;
 mod hub_skills;
 mod hub_templates;
 mod hub_inbox;
+mod hub_knowledge;
 mod hub_memory;
 mod hub_lists;
 mod hub_tts;
@@ -4159,6 +4160,9 @@ pub fn run() {
                     hub_inbox::hub_inbox_mark_read,
                     hub_memory::hub_memory_list,
                     hub_memory::hub_memory_read,
+                    hub_knowledge::hub_knowledge_collections,
+                    hub_knowledge::hub_knowledge_search,
+                    hub_knowledge::hub_knowledge_get,
                     // Chat box: "+" pictures, "/" commands, the model menu and /rename.
                     import_prompt_image,
                     list_slash_commands,

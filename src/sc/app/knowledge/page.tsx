@@ -1,7 +1,8 @@
 'use client'
 
-import { KnowledgeDetail } from '@/components/knowledge/knowledge-detail'
+// Hub: Jordan's qmd library (src/sc-hub/knowledge-page.tsx).
+import { HubKnowledge } from '../../../sc-hub/knowledge-page'
 
 export default function KnowledgePage() {
-  return <KnowledgeDetail />
+  return <HubKnowledge />
 }

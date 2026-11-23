@@ -505,3 +505,19 @@ test('memory: what the agents remember, by where it applies and by kind (color a
   await expect.poll(async () => (await calls(page, 'hub_open_path')).map(c => c.args.path)).toEqual(['C:/m/no-telegram.md']);
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-memory.png`, fullPage: true });
 });
+
+test('knowledge: search his library, narrow to one collection, read a result', async ({ page }) => {
+  await open(page, '/knowledge');
+  await expect(page.getByRole('heading', { name: 'Knowledge', exact: true })).toBeVisible();
+  await page.getByLabel('Search your library').fill('cooling fans');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const results = page.getByRole('region', { name: 'Results' });
+  await expect(results.getByRole('listitem')).toHaveCount(2);
+  await expect(results.getByText('Fans and heat')).toBeVisible(); // snippet without qmd's header lines
+  await page.getByRole('region', { name: 'Collections' }).getByRole('button', { name: /Starred repos/ }).click();
+  await expect(results.getByRole('listitem')).toHaveCount(1);
+  await expect.poll(async () => (await calls(page, 'hub_knowledge_search')).map(c => c.args.collection)).toEqual([null, 'github-stars']);
+  await results.getByRole('button', { name: /fan-control repo/ }).click();
+  await expect(page.getByRole('region', { name: 'Document' })).toContainText('Full text of qmd://github-stars/fan.md');
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-knowledge.png`, fullPage: true });
+});
