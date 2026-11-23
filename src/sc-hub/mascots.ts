@@ -118,6 +118,29 @@ function tool(kind: string): string {
 
 const BODY = 'M32 7C18.5 7 11 18 11 32v16c0 5.5 3.5 8 8 8h26c4.5 0 8-2.5 8-8V32C53 18 45.5 7 32 7z';
 
+const xy = (r: number, a: number, cx = 32, cy = 31) => `${(cx + r * Math.cos(a)).toFixed(1)} ${(cy + r * Math.sin(a)).toFixed(1)}`;
+/** A star or flower: points around the middle, alternating an outer and an inner radius. */
+const ring = (n: number, outer: number, inner: number, turn = 0) =>
+  `M${Array.from({ length: n * 2 }, (_, i) => xy(i % 2 ? inner : outer, (Math.PI * i) / n + turn - Math.PI / 2)).join('L')}z`;
+/** A regular polygon (n corners, the first one at the top unless turned). */
+const poly = (n: number, r: number, turn = 0) =>
+  `M${Array.from({ length: n }, (_, i) => xy(r, (2 * Math.PI * i) / n + turn - Math.PI / 2)).join('L')}z`;
+
+/** Each body follows its logo's outline; a thick round edge ("round") keeps it a soft blob. Others: the plain blob. */
+const SHAPES: Record<string, { d: string; round: number }> = {
+  claude: { d: ring(12, 24.5, 17.5), round: 8 }, // Claude's starburst
+  codex: { d: ring(6, 23.5, 15, Math.PI / 6), round: 11 }, // OpenAI's six-lobed knot
+  gemini: { d: ring(4, 26, 12), round: 9 }, // Gemini's four-point sparkle
+  qwen: { d: poly(6, 24, Math.PI / 6), round: 9 }, // Qwen's hexagon
+  cursor: { d: poly(6, 25), round: 6 }, // Cursor's cube
+  opencode: { d: 'M15 11H49V53H15z', round: 10 }, // OpenCode's terminal square
+  deepseek: { d: 'M9 37a23 18.5 0 1 0 46 0a23 18.5 0 1 0-46 0zM42 21L49 9.5L56 16z', round: 6 }, // DeepSeek's whale
+  copilot: { d: 'M14 18H50V51H14zM6 27a6 6 0 1 0 12 0a6 6 0 1 0-12 0zM46 27a6 6 0 1 0 12 0a6 6 0 1 0-12 0z', round: 8 }, // Copilot's goggled head
+  muse: { d: 'M8 30a13 13 0 1 0 26 0a13 13 0 1 0-26 0zM30 30a13 13 0 1 0 26 0a13 13 0 1 0-26 0zM15 36H49V51H15z', round: 5 }, // Meta's infinity loop
+};
+/** Harnesses whose body already is their logo; the rest wear their mark on the forehead. */
+const shapeIsMark = (harness: string) => !!SHAPES[harness] && harness !== 'opencode';
+
 /** The mascot for a seed from mascotSeed, as an SVG document; '' when the seed is not a mascot. */
 export function mascotSvg(seed: string): string {
   const [kind, harness, color, faceIndex, held] = seed.split('|');
@@ -125,7 +148,13 @@ export function mascotSvg(seed: string): string {
   const h = HARNESSES[harness];
   const dark = luma(color) < 110;
   const ink = dark ? LIGHT : (h?.mark === 'knot' || h?.mark === 'brackets' ? INK : LIGHT);
-  const markKind = h?.mark === 'goggles' ? '' : h?.mark ?? '';
+  const markKind = h?.mark === 'goggles' || shapeIsMark(harness) ? '' : h?.mark ?? '';
+  const s = SHAPES[harness] ?? { d: BODY, round: 0 };
+  const body = (fill: string) => `<path d="${s.d}" fill="${fill}"${s.round ? ` stroke="${fill}" stroke-width="${s.round}" stroke-linejoin="round"` : ''}/>`;
+  // Cursor's cube: a lighter top face and the edges, faintly.
+  const cube = harness === 'cursor'
+    ? `<path d="M32 6L53.7 18.5L32 31L10.3 18.5z" fill="${shade(color, 0.16)}" stroke="${shade(color, 0.16)}" stroke-width="5" stroke-linejoin="round" opacity=".7"/><path d="M32 31V56M32 31L53.7 18.5M32 31L10.3 18.5" stroke="${shade(color, 0.3)}" stroke-width="1.4" opacity=".5"/>`
+    : '';
   const faceNo = h?.mark === 'goggles' ? FACES.indexOf('Glasses') : Number(faceIndex) || 0;
   const t = tool(held ?? '');
   const hands = t ? `<circle cx="19.6" cy="47" r="3.8" fill="${shade(color, -0.12)}"/><circle cx="44.4" cy="47" r="3.8" fill="${shade(color, -0.12)}"/>` : '';
@@ -133,8 +162,11 @@ export function mascotSvg(seed: string): string {
     + `<defs><radialGradient id="hi" cx="34%" cy="24%" r="72%"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></radialGradient>`
     + `<linearGradient id="lo" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-opacity="0"/><stop offset="1" stop-opacity=".28"/></linearGradient></defs>`
     + `<ellipse cx="23" cy="56.6" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/><ellipse cx="41" cy="56.6" rx="4.4" ry="2.6" fill="${shade(color, -0.25)}"/>`
-    + `<path d="${BODY}" fill="${color}"${luma(color) < 70 ? ' stroke="rgba(255,255,255,.35)" stroke-width="1.2"' : ''}/>`
-    + `<path d="${BODY}" fill="url(#hi)"/><path d="${BODY}" fill="url(#lo)"/>`
+    // A dark body gets a faint light rim so it shows on the dark window.
+    + (luma(color) < 70 ? `<path d="${s.d}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="${s.round + 2.4}" stroke-linejoin="round"/>` : '')
+    // Light and shade are painted through a mask of the body, so the round edge and the fill never double up.
+    + `<mask id="m">${body('#fff')}</mask>`
+    + body(color) + `<rect width="64" height="64" fill="url(#hi)" mask="url(#m)"/><rect width="64" height="64" fill="url(#lo)" mask="url(#m)"/>` + cube
     + mark(markKind, ink)
     // Dark bodies get eye whites, or the eyes vanish.
     + (luma(color) < 80 ? `<ellipse cx="25" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/><ellipse cx="39" cy="29" rx="4.6" ry="5.8" fill="${LIGHT}"/>` : '')

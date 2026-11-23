@@ -9,7 +9,8 @@ test('a Claude Code agent is a shade of Claude orange with the starburst; its ow
   assert.equal(harness, 'claude');
   const [r, g] = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16)];
   assert.ok(r > 190 && g > 95 && g < 140, `orange, got ${color}`);
-  assert.match(mascotSvg(seed), /rotate\(45 32 15\)/);
+  assert.ok(mascotSvg(seed).includes('d="M32.0 6.5L'), 'the starburst body (its top ray)');
+  assert.ok(mascotSvg(mascotSeed('qwen', 'q', '', 0, '')).includes('stroke-linejoin="round"'), 'logo shapes keep soft round edges');
   assert.equal(agentColor('claude', 'b1', '#22c55e'), '#22c55e');
   assert.deepEqual(agentColorStyle(mascotSeed('claude', 'b1', '#22c55e', 0, '')), { '--agent-color': '#22c55e' });
 });
