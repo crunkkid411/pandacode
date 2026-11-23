@@ -4,6 +4,8 @@ import { botSchedules, createBotSchedule, preview, PREFIX, scheduleOwner, scSche
 import { loadLibrary } from './bot-skills';
 import { isChatProject } from '../chats';
 import { boardTasks, createBoardTask, settleDone, updateBoardTask } from './board-tasks';
+import { forSend, spoken, uploadPicture } from './attachments';
+import { chatCommands, forwardMentions, slashParts } from './chat-commands';
 
 /** PandaCode projects an agent can work in (bots' own workspaces left out). */
 async function projects(call: Call) {
@@ -66,7 +68,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /** Sends one message to a PandaCode chat and streams the reply back in SwarmClaw's "data: {...}" format.
  *  PandaCode writes replies to its store, so this re-reads the chat every 1.5 s until it stops working. */
-export function chatStream(call: Call, id: string, text: string, pollMs = 1500): Response {
+export function chatStream(call: Call, id: string, text: string, pollMs = 1500, imageIds: string[] = []): Response {
   const enc = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(out) {
@@ -75,8 +77,8 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500):
         const before = (await call<{ messages: PcMessage[] }>('get_messages', { sessionId: id })).messages.at(-1)?.id ?? 0;
         // An agent's own thread goes through the bot, so it gets its brief, team and queue.
         const botId = await botOfThread(call, id);
-        if (botId) await call('bot_message', { botId, text });
-        else await call('send_message', { sessionId: id, text });
+        if (botId) await call('bot_message', { botId, text, imageIds, moodboardIds: [] });
+        else await call('send_message', { sessionId: id, text, imageIds, moodboardIds: [] });
         const started = Date.now();
         let shown = '', errors = 0, sawWork = false;
         while (Date.now() - started < 60 * 60_000) {
@@ -101,6 +103,37 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500):
     },
   });
   return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+/** A one-line answer in the chat (a command's result, or a problem in red), in SwarmClaw's stream format. */
+function note(text: string, problem = false): Response {
+  const line = (e: Record<string, unknown>) => `data: ${JSON.stringify(e)}\n\n`;
+  return new Response(line(problem ? { t: 'err', text } : { t: 'r', text }) + line({ t: 'done' }), { headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+/** The Hub's own slash commands. Returns the answer to show, or null when it is not one of them. */
+async function hubSlash(call: Call, id: string, name: string, args: string): Promise<string | null> {
+  if (name === '/agent') return 'Pick an agent from the list that opens when you type /agent.';
+  if (name === '/rename') {
+    if (!args) throw new Error('Type the new name after /rename.');
+    await call('update_session', { sessionId: id, title: args });
+    return `Renamed this chat to "${args}".`;
+  }
+  if (name === '/model') {
+    const c = (await call<Chat[]>('list_sessions')).find(x => x.id === id);
+    if (!c) throw new Error('That chat no longer exists in PandaCode.');
+    const models = await call<{ id: string; name: string }[]>('list_provider_models', { provider: c.provider, force: false });
+    if (!args) return `Models you can use here: ${models.map(m => m.name || m.id).join(', ')}. Type /model and a name, or use the model menu under the box.`;
+    const want = args.toLowerCase();
+    const m = models.find(x => x.id.toLowerCase() === want || (x.name || '').toLowerCase() === want)
+      ?? models.find(x => (x.name || x.id).toLowerCase().includes(want) || x.id.toLowerCase().includes(want));
+    if (!m) throw new Error(`No model here matches "${args}". Type /model to see the list.`);
+    const botId = await botOfThread(call, id);
+    if (botId) await updateBotAgent(call, botId, { model: m.id });
+    else await call('update_session', { sessionId: id, model: m.id });
+    return `Now using ${m.name || m.id}.`;
+  }
+  return null;
 }
 
 async function chatMessages(call: Call, id: string, limit: string | null) {
@@ -262,7 +295,55 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/chats$/, run: async ({ call }) => Object.fromEntries((await pcChats(call)).map(c => [c.id, chatSession(c)])) },
   { method: 'GET', path: /^\/chats\/([^/]+)$/, run: ({ call, match }) => oneChat(call, match[1]) },
   { method: 'GET', path: /^\/chats\/([^/]+)\/messages$/, run: ({ call, match, query }) => chatMessages(call, match[1], query.get('limit')) },
-  { method: 'POST', path: /^\/chats\/([^/]+)\/chat$/, run: async ({ call, match, body }) => chatStream(call, match[1], String((body as { message?: string } | null)?.message ?? '')) },
+  { method: 'POST', path: /^\/chats\/([^/]+)\/chat$/, run: async ({ call, match, body }) => {
+    const b = (body ?? {}) as { message?: string; imagePath?: string; attachedFiles?: string[] };
+    const id = match[1];
+    try {
+      const message = String(b.message ?? '');
+      const slash = slashParts(message);
+      if (slash) {
+        const done = await hubSlash(call, id, slash.name, slash.args);
+        if (done) return note(done);
+        // A command this agent program does not run itself (a PandaCode window control) is not sent.
+        const resolved = await call<{ action: string | null }>('resolve_slash_command', { sessionId: id, text: message });
+        if (resolved.action) return note(`${slash.name} works in PandaCode's main window, not in the Hub.`, true);
+      }
+      const sent = forSend(message, b.attachedFiles?.length ? b.attachedFiles : b.imagePath ? [b.imagePath] : []);
+      const bots = await listBots(call);
+      const own = bots.find(x => x.desktopSession === id);
+      await forwardMentions(call, id, own?.name ?? (await oneChat(call, id)).name, sent.text, bots, sent.imageIds);
+      return chatStream(call, id, sent.text, 1500, sent.imageIds);
+    } catch (e) {
+      return note(String(e).replace(/^Error:\s*/, ''), true); // shown in red in the chat, in plain words
+    }
+  } },
+  // "/" in the chat box: the Hub's own commands, then this agent program's commands and skills.
+  { method: 'GET', path: /^\/chats\/([^/]+)\/commands$/, run: ({ call, match }) => chatCommands(call, match[1]) },
+  // The speaker: becky-tts reads the reply (src-tauri/src/hub_tts.rs); code and markdown signs are not read.
+  { method: 'POST', path: /^\/tts$/, run: async ({ call, body }) => {
+    const wav = await call<ArrayBuffer>('hub_speak', { text: spoken(String((body as { text?: string } | null)?.text ?? '')) });
+    return new Response(wav, { headers: { 'Content-Type': 'audio/wav' } });
+  } },
+  // The chat box's model menu: the models this chat's agent program offers, and switching one.
+  { method: 'GET', path: /^\/chats\/([^/]+)\/models$/, run: async ({ call, match }) => {
+    const c = (await call<Chat[]>('list_sessions')).find(x => x.id === match[1]);
+    if (!c) throw new Error('That chat no longer exists in PandaCode.');
+    const bot = (await listBots(call)).find(b => b.desktopSession === c.id);
+    const models = await call<{ id: string; name: string }[]>('list_provider_models', { provider: c.provider, force: false });
+    return { current: bot?.model ?? c.model, models: models.map(m => ({ id: m.id, name: m.name || m.id })) };
+  } },
+  { method: 'PUT', path: /^\/chats\/([^/]+)\/model$/, run: async ({ call, match, body }) => {
+    const model = String((body as { model?: string } | null)?.model ?? '');
+    if (!model) throw new Error('Pick a model.');
+    const botId = await botOfThread(call, match[1]);
+    if (botId) await updateBotAgent(call, botId, { model }); // an agent's chat runs on the agent's model
+    else await call('update_session', { sessionId: match[1], model });
+    return { ok: true, model };
+  } },
+  { method: 'POST', path: /^\/upload$/, run: ({ call, body }) => {
+    if (!(body instanceof Blob)) throw new Error('Nothing to attach.');
+    return uploadPicture(call, body as Blob & { name?: string });
+  } },
   { method: 'POST', path: /^\/chats\/([^/]+)\/stop$/, run: async ({ call, match }) => { await call('stop_session', { sessionId: match[1] }); return { ok: true }; } },
   // "New chat" in SwarmClaw's chat header: a fresh PandaCode chat with the same agent and model.
   { method: 'POST', path: /^\/chats$/, run: async ({ call, body }) => {

@@ -1,3 +1,5 @@
+import { toast } from 'sonner'
+
 let audioCtx: AudioContext | null = null
 let currentSource: AudioBufferSourceNode | null = null
 
@@ -18,12 +20,19 @@ export async function speak(text: string, voiceId?: string | null) {
   ensureContext()
   if (!audioCtx) return
 
+  // Hub: becky-tts loads its voice on every reply, so say that it is coming, and say why if it fails.
+  const waiting = toast.loading('Reading the reply aloud. The voice takes about 40 seconds to start.')
   const res = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: text.slice(0, 2000), ...(voiceId ? { voiceId } : {}) }),
   })
-  if (!res.ok) return
+  toast.dismiss(waiting)
+  if (!res.ok) {
+    const failure = await res.json().catch(() => null) as { error?: string } | null
+    toast.error(failure?.error?.replace(/^Error:\s*/, '') || 'The voice could not read this reply.')
+    return
+  }
 
   const buf = await res.arrayBuffer()
   const audio = await audioCtx.decodeAudioData(buf)

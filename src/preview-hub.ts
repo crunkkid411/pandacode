@@ -124,6 +124,19 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
     case 'bot_task_links': return { ...taskLinks };
     case 'bot_task_brief': return taskLinks[args.sessionId] ? `\n\nBot brief: you are ${botById(taskLinks[args.sessionId]).name}.` : null;
     case 'overlay_open_task': return undefined;
+    case 'list_slash_commands': return { warnings: [], commands: [
+      { name: '/model', description: 'Choose a model', source: 'PandaCode', kind: 'action' },
+      { name: '/permissions', description: 'Change permissions', source: 'PandaCode', kind: 'action' },
+      { name: '/review', description: 'Review the changes', argumentHint: null, source: 'Claude Code', kind: 'native' },
+      { name: '/video-rules', description: 'Video editing rules', source: 'Skill', kind: 'skill' },
+    ] };
+    case 'resolve_slash_command': {
+      const name = String(args.text).split(/\s/)[0];
+      if (name === '/permissions') return { action: 'permissions', arguments: '' };
+      if (['/review', '/video-rules'].includes(name)) return { action: null, arguments: '' };
+      throw new Error(`Unknown command ${name}. Type / to browse this harness's commands, or refresh the list.`);
+    }
+    case 'update_session': { const c: any = chats.find(x => x.id === args.sessionId); if (args.title) c.title = args.title; if (args.model) c.model = args.model; return undefined; }
     case 'stop_session': {
       const c = chats.find(x => x.id === args.sessionId);
       if (c) c.status = 'interrupted';
@@ -162,6 +175,9 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { kind: 'command', name: 'deploy', description: 'Ships a build', places: ['OpenCode'], path: 'C:/oc/deploy.md', ours: false },
     { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
   ] as T;
+  if (command === 'hub_speak') return new ArrayBuffer(0) as T;
+  if (command === 'plugin:dialog|open') return ((window as any).__hubPick ?? null) as T;
+  if (command === 'import_prompt_image') return { id: `img-${args.path ?? args.name}`, name: 'pic.png', width: 1, height: 1, thumbnail: 'data:image/png;base64,iVBORw0KGgo=' } as T;
   if (command === 'hub_agent_templates') return [
     { path: 'C:/hermes/profiles/scout/SOUL.md', name: 'scout', description: 'You are the Scout', source: 'Hermes bot', provider: 'hermes', model: 'profile:scout' },
     { path: 'X:/AI-2/agent-templates/chief-of-staff.md', name: 'Chief of Staff', description: 'His one point of contact', source: 'Yours', provider: 'claude', role: 'coordinator' },

@@ -83,6 +83,96 @@ test('agents: each agent is a PandaCode bot; talking to one goes through the bot
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agents.png` });
 });
 
+test('chat box: + attaches a picture as a picture and a document by its full path', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubPick = ['C:\\pics\\shot.png', 'X:\\notes\\plan.md']; });
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Add attachment' }).click();
+  await expect(page.getByText('plan.md', { exact: true })).toBeVisible();
+  const box = page.locator('textarea').first();
+  await box.fill('look at these');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'bot_message')).map(c => [c.args.text, c.args.imageIds])).toEqual([[
+    'look at these\n\nAttached files (full paths on this PC):\n- X:\\notes\\plan.md', ['img-C:\\pics\\shot.png']]]);
+});
+
+test('chat box: the speaker reads each reply once with becky-tts, and stays on after reload', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const speaker = page.getByRole('button', { name: 'Read replies aloud' });
+  await speaker.click();
+  await expect(speaker).toHaveAttribute('aria-pressed', 'true');
+  const box = page.locator('textarea').first();
+  await box.fill('say **hi**');
+  await box.press('Enter');
+  await expect(page.getByText('Done: say').first()).toBeVisible();
+  await expect.poll(async () => (await calls(page, 'hub_speak')).map(c => c.args.text)).toEqual(['Done: say hi']);
+  await page.waitForTimeout(3000);
+  expect(await calls(page, 'hub_speak')).toHaveLength(1); // read once, not again on refresh
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Read replies aloud' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test("chat box: the model menu lists the agent program's models and switches the agent", async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Change model' }).click();
+  await page.getByRole('menuitemradio', { name: 'Sonnet 5.5' }).click();
+  await expect.poll(async () => (await calls(page, 'bot_update')).map(c => [c.args.botId, c.args.input.model])).toEqual([['b1', 'claude-sonnet-5-5']]);
+  await expect(page.getByRole('button', { name: 'Change model' })).toHaveText(/Sonnet 5\.5/);
+});
+
+test('chat box: "/" lists Hub and agent commands; /agent opens another agent; window-only commands are refused', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('/');
+  const list = page.getByRole('listbox', { name: 'Commands' });
+  for (const name of ['/agent', '/rename', '/review', '/video-rules']) await expect(list.getByText(new RegExp(`^${name}`))).toBeVisible();
+  await expect(list.getByText(/^\/permissions/)).toHaveCount(0); // a PandaCode window control
+  await box.fill('/agent cl');
+  await list.getByText('Clip Finder', { exact: true }).click();
+  await expect(page).toHaveURL(/#\/agents\/b3$/);
+  await expect(box).toHaveValue('');
+  // A harness command goes to the agent as written.
+  await box.fill('/review');
+  await box.press('Escape');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'bot_message')).map(c => c.args.text)).toEqual(['/review']);
+  await expect(page.getByText('Done: /review').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Stop/ })).toHaveCount(0);
+  // A window control typed in full is not sent; the chat says where it works.
+  await box.fill('/permissions');
+  await box.press('Enter');
+  await expect(page.getByText("/permissions works in PandaCode's main window, not in the Hub.")).toBeVisible();
+  expect((await calls(page, 'bot_message')).length).toBe(1);
+});
+
+test('chat box: /rename and /model run in the Hub', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('/model sonnet');
+  await box.press('Escape');
+  await box.press('Enter');
+  await expect(page.getByText('Now using Sonnet 5.5.')).toBeVisible();
+  await expect.poll(async () => (await calls(page, 'bot_update')).map(c => c.args.input.model)).toEqual(['claude-sonnet-5-5']);
+  await box.fill('/rename Morning notes');
+  await box.press('Escape');
+  await box.press('Enter');
+  await expect(page.getByText('Renamed this chat to "Morning notes".')).toBeVisible();
+  expect(await calls(page, 'bot_message')).toHaveLength(0);
+});
+
+test('chat box: "@" lists agents; a tagged agent gets the message in its own chat', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('please ask @cl');
+  await page.getByRole('listbox', { name: 'Agents to tag' }).getByText('Clip Finder', { exact: true }).click();
+  await expect(box).toHaveValue('please ask @Clip Finder ');
+  await box.press('Enter');
+  await expect(page.getByText('Also sent to Clip Finder')).toBeVisible();
+  await expect.poll(async () => (await calls(page, 'bot_message')).map(c => [c.args.botId, c.args.text])).toEqual([
+    ['b3', 'Jordan tagged you in his chat with Chief of Staff:\n\nplease ask @Clip Finder'],
+    ['b1', 'please ask @Clip Finder'],
+  ]);
+});
+
 test('agents: SwarmClaw layout with Chat and Config tabs and + Agent; pin sticks after reload', async ({ page }) => {
   await open(page, '/agents/b1');
   for (const tab of ['chat', 'config']) await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();

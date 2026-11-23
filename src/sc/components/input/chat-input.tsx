@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useChatStore } from '@/stores/use-chat-store'
 import { useAppStore } from '@/stores/use-app-store'
 import { selectActiveSessionId } from '@/stores/slices/session-slice'
@@ -12,6 +12,14 @@ import { ComposerShell } from '@/components/input/composer-shell'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { listQueuedMessagesForSession } from '@/lib/chat/queued-message-queue'
 import { toast } from 'sonner'
+import { call } from '../../../bridge'
+import { pickFiles } from '../../../sc-hub/attachments'
+import { initAudioContext, stopSpeaking } from '@/lib/tts'
+import { ModelMenu } from '../../../sc-hub/model-menu'
+import { useChatSuggest } from '../../../sc-hub/chat-suggest'
+import { agentNamed, mentioned, slashParts } from '../../../sc-hub/chat-commands'
+import { useNavigate } from '@/lib/app/navigation'
+import type { Agent } from '@/types'
 import { safeStorageGet, safeStorageRemove, safeStorageSet } from '@/lib/app/safe-storage'
 import { errorMessage } from '@/lib/shared-utils'
 
@@ -38,10 +46,19 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
   const addPendingFile = useChatStore((s) => s.addPendingFile)
   const removePendingFile = useChatStore((s) => s.removePendingFile)
   const clearPendingFiles = useChatStore((s) => s.clearPendingFiles)
+  const ttsEnabled = useChatStore((s) => s.ttsEnabled)
+  const toggleTts = useChatStore((s) => s.toggleTts)
   const replyingTo = useChatStore((s) => s.replyingTo)
+  // Hub: "/" and "@" lists (src/sc-hub/chat-suggest.tsx)
+  const agentMap = useAppStore((s) => s.agents)
+  const agentList = useMemo(() => Object.values(agentMap), [agentMap])
+  const currentAgentId = useAppStore((s) => s.currentAgentId)
+  const navigateTo = useNavigate()
+  const openAgent = useCallback((agent: Agent) => navigateTo('agents', agent.id), [navigateTo])
   const setReplyingTo = useChatStore((s) => s.setReplyingTo)
   const speechRecognitionLang = useAppStore((s) => s.appSettings.speechRecognitionLang)
   const sessionId = useAppStore(selectActiveSessionId)
+  const suggest = useChatSuggest({ value, setValue, sessionId, agents: agentList, onAgent: openAgent })
 
   const queuedMessages = useChatStore((s) => s.queuedMessages)
   const queueMessage = useChatStore((s) => s.queueMessage)
@@ -89,6 +106,16 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
   const handleSend = useCallback(async () => {
     const text = value.trim()
     if (!text && !pendingFiles.length) return
+    // Hub: "/agent Name" opens that agent's chat instead of sending.
+    const slash = slashParts(text)
+    if (slash?.name === '/agent') {
+      const agent = agentNamed(slash.args, agentList)
+      if (agent) { setValue(''); openAgent(agent) }
+      else toast.error(slash.args ? `No agent is named "${slash.args}".` : 'Type an agent name after /agent.')
+      return
+    }
+    const tagged = mentioned(text, agentList.filter((a) => a.id !== currentAgentId))
+    if (tagged.length) toast.success(`Also sent to ${tagged.map((a) => a.name).join(', ')}`)
     const replyToId = replyingTo?.message?.replyToId
       ? undefined
       : replyingTo?.message
@@ -120,14 +147,15 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
       textareaRef.current.style.height = 'auto'
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearPendingFiles, onSend, pendingFiles, queueMessage, replyingTo, sessionId, setReplyingTo, shouldQueue, value])
+  }, [agentList, clearPendingFiles, currentAgentId, onSend, openAgent, pendingFiles, queueMessage, replyingTo, sessionId, setReplyingTo, shouldQueue, value])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (suggest.onKeyDown(e)) return
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       void handleSend()
     }
-  }, [handleSend])
+  }, [handleSend, suggest])
 
   const handleVoice = useCallback((text: string) => {
     if (shouldQueue && sessionId) {
@@ -153,7 +181,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
       const result = await uploadImage(file)
       addPendingFile({ file, path: result.path, url: result.url })
     } catch (err: unknown) {
-      console.error('File upload failed:', errorMessage(err))
+      toast.error(errorMessage(err))
     }
   }, [addPendingFile])
 
@@ -354,6 +382,8 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
           </div>
         )}
 
+        <div className="relative">
+        {suggest.popup}
         <ComposerShell
           top={pendingFiles.length > 0 ? (
             <div className="flex items-center gap-2 px-5 pt-4 flex-wrap">
@@ -364,9 +394,10 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
           ) : undefined}
           footer={(
             <div className="flex items-center gap-1 px-4 pb-3.5">
-              {/* Hub: no file uploads into PandaCode chats yet */ false && <button
+              {/* Hub: "+" opens the Windows file picker (src/sc-hub/attachments.ts) */}
+              <button
                 type="button"
-                onClick={() => setExtrasOpen((open) => !open)}
+                onClick={() => { void pickFiles(call).then((files) => files.forEach(addPendingFile)).catch((err: unknown) => toast.error(errorMessage(err))) }}
                 aria-label="Add attachment"
                 data-testid="chat-add"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] border-none bg-transparent
@@ -378,7 +409,25 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
                   <path d="M5 12h14" />
                 </svg>
                 <span className="hidden sm:inline">Add</span>
-              </button>}
+              </button>
+
+              {/* Hub: speaker = read each reply aloud with becky-tts (src-tauri/src/hub_tts.rs) */}
+              <button
+                type="button"
+                onClick={() => { if (ttsEnabled) stopSpeaking(); else initAudioContext(); toggleTts() }}
+                aria-label="Read replies aloud"
+                aria-pressed={ttsEnabled}
+                title={ttsEnabled ? 'Reading replies aloud. Click to stop.' : 'Read replies aloud'}
+                className={`flex items-center justify-center w-9 h-9 rounded-[10px] border-none cursor-pointer transition-all duration-200
+                  ${ttsEnabled ? 'bg-accent-soft text-accent-bright' : 'bg-transparent text-text-3 hover:text-text-2 hover:bg-white/[0.05]'}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  {ttsEnabled ? <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></> : <><line x1="16" y1="9" x2="22" y2="15" /><line x1="22" y1="9" x2="16" y2="15" /></>}
+                </svg>
+              </button>
+
+              <ModelMenu sessionId={sessionId} />
 
               <div className="flex-1" />
 
@@ -431,6 +480,7 @@ export function ChatInput({ streaming, busy, onSend, onStop, extensionChatAction
             style={{ fontFamily: 'inherit' }}
           />
         </ComposerShell>
+        </div>
 
         {extrasOpen && (
           <div className="absolute left-0 bottom-[72px] w-[280px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-white/[0.08] bg-raised/95 p-2 shadow-[0_18px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl">

@@ -22,6 +22,7 @@ import {
   type QueuedSessionMessage,
 } from '@/lib/chat/queued-message-queue'
 import { speak } from '../lib/tts'
+import { safeStorageGet, safeStorageSet } from '../lib/app/safe-storage'
 import { getStoredAccessKey } from '@/lib/app/api-client'
 import { useAppStore } from './use-app-store'
 import { selectActiveSessionId } from './slices/session-slice'
@@ -274,8 +275,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toolEvents: [],
   clearToolEvents: () => set({ toolEvents: [] }),
   lastUsage: null,
-  ttsEnabled: false,
-  toggleTts: () => set((s) => ({ ttsEnabled: !s.ttsEnabled })),
+  // Hub: the chat box's speaker stays on or off across restarts.
+  ttsEnabled: safeStorageGet('hub_tts') === '1',
+  toggleTts: () => set((s) => { safeStorageSet('hub_tts', s.ttsEnabled ? '0' : '1'); return { ttsEnabled: !s.ttsEnabled } }),
   soundEnabled: getSoundEnabled(),
   toggleSound: () => {
     const next = !get().soundEnabled

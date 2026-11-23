@@ -15,6 +15,9 @@ export const FILE_TYPE_COLORS: Record<string, string> = {
 }
 
 export function parseAttachmentUrl(filePath?: string, fileUrl?: string) {
+  // Hub: a picture handed to PandaCode ("pc-image:<id>") or a file on this PC has no /api/uploads address;
+  // the sent message lists those files by their full paths instead.
+  if (filePath && (filePath.startsWith('pc-image:') || /^[A-Za-z]:[\\/]/.test(filePath)) && !fileUrl) return { url: '', filename: '' }
   const url = fileUrl || (filePath ? `/api/uploads/${filePath.split('/').pop()}` : '')
   const rawName = filePath?.split('/').pop() || fileUrl?.split('/').pop() || 'file'
   const filename = rawName.replace(/^[a-f0-9]+-/, '').split('?')[0]

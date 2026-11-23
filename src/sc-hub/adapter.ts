@@ -31,7 +31,8 @@ export function installAdapter() {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = url.replace(/^https?:\/\/[^/]+/, '');
     if (!path.startsWith('/api/')) return real(input, init);
-    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+    // A pasted or dropped picture arrives as a File (POST /api/upload).
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body instanceof Blob ? init.body : undefined;
     return answer((init?.method ?? 'GET').toUpperCase(), path.slice(4), body);
   };
 }

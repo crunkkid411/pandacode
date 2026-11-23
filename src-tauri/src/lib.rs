@@ -6,6 +6,7 @@ mod hub;
 mod hub_org;
 mod hub_skills;
 mod hub_templates;
+mod hub_tts;
 mod hub_tools;
 mod hub_voice;
 mod agent_usage;
@@ -4144,6 +4145,12 @@ pub fn run() {
                     // New-agent form: agent templates (opencompany, Claude-Extras, plugins, Hermes bots).
                     hub_templates::hub_agent_templates,
                     hub_templates::hub_agent_template,
+                    hub_tts::hub_speak,
+                    // Chat box: "+" pictures, "/" commands, the model menu and /rename.
+                    import_prompt_image,
+                    list_slash_commands,
+                    resolve_slash_command,
+                    update_session,
                     // Voice panel: start / stop Jordan's voice agent.
                     hub_voice::hub_voice_status,
                     hub_voice::hub_voice_start,

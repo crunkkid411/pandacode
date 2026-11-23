@@ -8,7 +8,7 @@ export function FilePreview({ file, onRemove }: { file: PendingFile; onRemove: (
     <div className="relative">
       {isImage ? (
         <img
-          src={URL.createObjectURL(file.file)}
+          src={file.url.startsWith('data:') ? file.url : URL.createObjectURL(file.file)}
           alt="Preview"
           className="h-16 rounded-[10px] object-cover border border-white/[0.06]"
         />
