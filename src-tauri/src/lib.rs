@@ -4110,6 +4110,16 @@ pub fn run() {
                     capabilities::capabilities_inventory,
                     list_projects,
                     bots::bot_project_ids,
+                    // Task Board: PandaCode's tasks, handed to agents.
+                    create_board_task,
+                    update_task_details,
+                    set_task_stage,
+                    configure_session,
+                    start_task,
+                    bots::bot_assign_task,
+                    bots::bot_task_links,
+                    bots::bot_task_brief,
+                    overlay::overlay_open_task,
                     // SwarmClaw's Schedules page: each agent's own schedules.
                     bots::schedule::bot_schedule_create,
                     bots::schedule::bot_schedule_set_enabled,

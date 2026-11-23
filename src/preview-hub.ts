@@ -20,6 +20,7 @@ const chats: Chat[] = [
   { id: 'c2', title: 'Write the shorts captions', provider: 'opencode', model: 'deepseek', status: 'running', archived: false, createdAt: now - 8e6, updatedAt: now - 8e6, lastResponseAt: now - 60_000 },
   { id: 'c3', title: 'Old archived chat', provider: 'claude', model: 'default', status: 'idle', archived: true, createdAt: now - 9e7, updatedAt: now - 9e7, lastResponseAt: now - 9e7 },
 ];
+const taskLinks: Record<string, string> = {}; // task -> bot (bot_tasks)
 const messages: Record<string, ChatMessage[]> = {
   c1: [{ id: 1, role: 'user', content: 'Why did the scout run hot?', createdAt: now - 3_700_000 }, { id: 2, role: 'assistant', content: 'It ran Qwen3.5-4B on the graphics card.', createdAt: now - 3_600_000 }],
   c2: [{ id: 3, role: 'user', content: 'Caption the new short', createdAt: now - 70_000 }],
@@ -87,9 +88,10 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       (messages[c.id] ??= []).push({ id: nextId++, role: 'user', content: args.text, createdAt: Date.now() });
       c.status = 'running';
       c.lastPromptAt = Date.now();
+      if ((c as any).taskStage) (c as any).taskStage = 'in_progress';
       // The agent answers after a moment, unless a test holds it running.
       if (args.text === 'FAIL') { messages[c.id].push({ id: nextId++, role: 'error', content: 'This harness cannot run here.', createdAt: Date.now() }, { id: nextId++, role: 'changes', content: '', createdAt: Date.now() }); c.status = 'error'; return undefined; }
-      if (!w.__hubHoldRunning) setTimeout(() => { messages[c.id].push({ id: nextId++, role: 'assistant', content: `Done: ${args.text}`, createdAt: Date.now() }); c.status = 'idle'; c.lastResponseAt = Date.now(); }, 300);
+      if (!w.__hubHoldRunning) setTimeout(() => { messages[c.id].push({ id: nextId++, role: 'assistant', content: `Done: ${args.text}`, createdAt: Date.now() }); c.status = 'idle'; c.lastResponseAt = Date.now(); if ((c as any).taskStage) (c as any).taskStage = 'review'; }, 300);
       return undefined;
     }
     case 'bots_list': return bots.map(b => ({ ...b }));
@@ -101,13 +103,27 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
     case 'bot_set_capabilities': { const b = botById(args.botId); b.skills = args.skills; b.mcp = args.mcp; return { ...b }; }
     case 'bot_desktop_thread': {
       const b = botById(args.botId);
-      if (!b.desktopSession) { const c: Chat = { id: `t-${b.id}`, title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id; }
+      if (!b.desktopSession) { const c: Chat & { projectId: string } = { id: `t-${b.id}`, projectId: 'pb1', title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id; }
       return b.desktopSession;
     }
     case 'bot_message': return invokeChats('send_message', { sessionId: invokeChats('bot_desktop_thread', args), text: args.text });
     case 'schedules_list': return schedules.map(x => ({ ...x }));
     case 'schedule_set_enabled': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.enabled = Boolean(args.enabled); return { ...x }; }
     case 'schedule_run_now': { const x = schedules.find(y => y.id === args.scheduleId); if (!x) throw new Error('No schedule'); x.runCount++; x.lastRunAt = Date.now(); return { scheduleId: x.id }; }
+    // Task Board: PandaCode tasks are these same sessions, with a stage and a description.
+    case 'create_board_task': {
+      const c: any = { id: `c${nextId++}`, title: args.title, taskDescription: args.description, taskStage: 'pending', projectId: args.projectId, provider: args.provider, model: args.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null };
+      chats.push(c);
+      return { ...c };
+    }
+    case 'update_task_details': { const c: any = chats.find(x => x.id === args.sessionId); c.title = args.title; c.taskDescription = args.description; c.taskStage ??= 'pending'; return { ...c }; }
+    case 'set_task_stage': { const c: any = chats.find(x => x.id === args.sessionId); c.taskStage = args.stage; return { ...c }; }
+    case 'configure_session': { const c: any = chats.find(x => x.id === args.sessionId); c.provider = args.provider; c.model = args.model; return { ...c }; }
+    case 'start_task': { const c: any = chats.find(x => x.id === args.sessionId); return invokeChats('send_message', { sessionId: c.id, text: c.taskDescription || c.title }); }
+    case 'bot_assign_task': { if (args.botId) taskLinks[args.sessionId] = args.botId; else delete taskLinks[args.sessionId]; return args.botId ? { ...botById(args.botId) } : null; }
+    case 'bot_task_links': return { ...taskLinks };
+    case 'bot_task_brief': return taskLinks[args.sessionId] ? `\n\nBot brief: you are ${botById(taskLinks[args.sessionId]).name}.` : null;
+    case 'overlay_open_task': return undefined;
     case 'stop_session': {
       const c = chats.find(x => x.id === args.sessionId);
       if (c) c.status = 'interrupted';

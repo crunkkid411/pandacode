@@ -22,7 +22,8 @@ import type { BoardTask, BoardTaskStatus } from '@/types'
 import { dedup } from '@/lib/shared-utils'
 import { toast } from 'sonner'
 
-const ACTIVE_COLUMNS: BoardTaskStatus[] = ['backlog', 'queued', 'running', 'completed', 'failed', 'cancelled']
+// Hub: PandaCode tasks have no Queued or Cancelled stage (see src/sc-hub/board-tasks.ts).
+const ACTIVE_COLUMNS: BoardTaskStatus[] = ['backlog', 'running', 'completed', 'failed']
 type BoardViewMode = 'board' | 'list'
 type AttentionFilter = 'all' | 'needs-attention' | 'blocked' | 'overdue' | 'failed'
 type TaskScopeFilter = 'user-facing' | 'all' | 'agent'
@@ -600,6 +601,7 @@ export default function TasksPage() {
             {showArchived ? 'Hide' : 'Show'} Archived{!showArchived && archivedCount > 0 ? ` (${archivedCount})` : ''}
           </button>
           <button
+            hidden /* Hub: he does not use GitHub */
             onClick={() => {
               resetGitHubImportState()
               setGitHubImportOpen(true)
@@ -623,11 +625,10 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-8 pb-4">
+      <div className="grid grid-cols-2 gap-3 px-8 pb-4">
         {[
           { key: 'needs-attention', label: 'Needs Attention', value: stats.attention, tone: 'text-red-300', accent: 'bg-red-500/10' },
-          { key: 'blocked', label: 'Blocked', value: stats.blocked, tone: 'text-rose-400', accent: 'bg-rose-500/10' },
-          { key: 'overdue', label: 'Overdue', value: stats.overdue, tone: 'text-red-400', accent: 'bg-red-500/10' },
+          // Hub: PandaCode tasks have no blockers or due dates, so Blocked and Overdue are left out.
           { key: 'failed', label: 'Failed', value: stats.failed, tone: 'text-orange-400', accent: 'bg-orange-500/10' },
         ].map((item) => (
           <button
@@ -657,8 +658,6 @@ export default function TasksPage() {
         {([
           ['all', 'All'],
           ['needs-attention', 'Needs Attention'],
-          ['blocked', 'Blocked'],
-          ['overdue', 'Overdue'],
           ['failed', 'Failed'],
         ] as const).map(([value, label]) => (
           <button
@@ -730,7 +729,7 @@ export default function TasksPage() {
       ) : null}
 
       {viewMode === 'board' ? (
-        <div className="flex-1 min-h-0 flex gap-5 px-8 pb-6 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x">
+        <div /* Hub: four columns side by side only on wide screens; otherwise two rows of two, never a sideways scroll. */ className="flex-1 min-h-0 grid grid-cols-2 2xl:grid-cols-4 auto-rows-[minmax(320px,1fr)] gap-5 px-8 pb-6 overflow-y-auto">
           {!loaded ? (
           ACTIVE_COLUMNS.map((status) => (
             <div key={status} className="flex flex-col gap-3 min-w-[260px] flex-1">
@@ -1074,8 +1073,8 @@ export default function TasksPage() {
             )}
           </div>
 
-          {/* Assign project */}
-          {Object.keys(projects).length > 0 && (
+          {/* Assign project. Hub: a PandaCode task stays in the project it was made in. */}
+          {false && Object.keys(projects).length > 0 && (
             <div className="relative" ref={bulkProjectRef}>
               <button
                 onClick={() => { setBulkProjectOpen(!bulkProjectOpen); setBulkStatusOpen(false); setBulkAgentOpen(false) }}

@@ -1,8 +1,9 @@
 // What each SwarmClaw API path means on Jordan's PC. Every answer comes from a Hub Rust command.
-import type { Agent, ProviderInfo, Schedule, Skill } from '../sc/types';
+import type { Agent, BoardTask, ProviderInfo, Schedule, Skill } from '../sc/types';
 import { botSchedules, createBotSchedule, preview, PREFIX, scheduleOwner, scSchedule } from './bot-schedules';
 import { loadLibrary } from './bot-skills';
 import { isChatProject } from '../chats';
+import { boardTasks, createBoardTask, settleDone, updateBoardTask } from './board-tasks';
 
 /** PandaCode projects an agent can work in (bots' own workspaces left out). */
 async function projects(call: Call) {
@@ -320,7 +321,17 @@ export const routes: Route[] = [
   { method: 'GET', path: /^\/providers$/, run: ({ call }) => providers(call) },
   { method: 'GET', path: /^\/providers\/configs$/, run: async () => [] },
   { method: 'GET', path: /^\/usage$/, run: ({ call, query }) => usage(call, query.get('range') ?? '7d') },
-  // SwarmClaw's own task board is not ours (J32 store still undecided): null hides its section.
   { method: 'GET', path: /^\/tasks\/metrics$/, run: async () => null },
-  { method: 'GET', path: /^\/tasks$/, run: async () => ({}) },
+  // Task Board: PandaCode's tasks (board-tasks.ts).
+  { method: 'GET', path: /^\/tasks$/, run: ({ call, query }) => boardTasks(call, query.get('includeArchived') === 'true') },
+  { method: 'POST', path: /^\/tasks$/, run: ({ call, body }) => createBoardTask(call, (body ?? {}) as Partial<BoardTask>) },
+  { method: 'PUT', path: /^\/tasks\/([^/]+)$/, run: ({ call, match, body }) => updateBoardTask(call, decodeURIComponent(match[1]), (body ?? {}) as Partial<BoardTask>) },
+  { method: 'POST', path: /^\/tasks\/bulk$/, run: async ({ call, body }) => {
+    const { ids = [], ...patch } = (body ?? {}) as { ids?: string[] } & Partial<BoardTask>;
+    for (const id of ids) await updateBoardTask(call, id, patch);
+    return { updated: ids.length, ids };
+  } },
+  { method: 'DELETE', path: /^\/tasks$/, run: ({ call }) => settleDone(call) },
+  // "View": the task's conversation in PandaCode's main window.
+  { method: 'POST', path: /^\/tasks\/([^/]+)\/open$/, run: async ({ call, match }) => { await call('overlay_open_task', { sessionId: decodeURIComponent(match[1]) }); return { ok: true }; } },
 ];

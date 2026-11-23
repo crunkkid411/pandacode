@@ -9,7 +9,8 @@ const COLUMN_CONFIG: Record<BoardTaskStatus, { label: string; color: string; dot
   backlog: { label: 'Backlog', color: 'text-text-3', dot: 'bg-white/20' },
   queued: { label: 'Queued', color: 'text-amber-400', dot: 'bg-amber-400' },
   running: { label: 'Running', color: 'text-blue-400', dot: 'bg-blue-400' },
-  completed: { label: 'Completed', color: 'text-emerald-400', dot: 'bg-emerald-400' },
+  completed: { label: 'Review', // Hub: PandaCode's "ready for your review" stage
+  color: 'text-emerald-400', dot: 'bg-emerald-400' },
   failed: { label: 'Failed', color: 'text-red-400', dot: 'bg-red-400' },
   cancelled: { label: 'Cancelled', color: 'text-text-3', dot: 'bg-white/20' },
   archived: { label: 'Archived', color: 'text-text-3/50', dot: 'bg-white/10' },
@@ -82,7 +83,7 @@ export function TaskColumn({
 
   return (
     <div
-      className={`flex-1 min-w-[240px] max-w-[320px] min-h-0 flex flex-col rounded-[16px] transition-colors duration-150 ${
+      className={`min-w-0 min-h-0 flex flex-col rounded-[16px] transition-colors duration-150 ${
         dragOver ? 'bg-accent-bright/[0.04] ring-1 ring-accent-bright/20' : ''
       }`}
       onDragOver={handleDragOver}

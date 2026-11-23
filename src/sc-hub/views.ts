@@ -2,7 +2,7 @@ import type { AppView } from '../sc/types';
 
 /** SwarmClaw pages the Hub shows: only those with real data behind them (J10: no hollow buttons).
  *  Add a view here when its API paths are answered in routes.ts. */
-export const HUB_VIEWS = new Set<AppView>(['agents', 'org_chart', 'schedules', 'skills', 'providers', 'usage']);
+export const HUB_VIEWS = new Set<AppView>(['agents', 'org_chart', 'tasks', 'schedules', 'skills', 'providers', 'usage']);
 export const HUB_HOME = '/org-chart';
 
 /** True when at least one of a sidebar section's pages is shown in the Hub. */

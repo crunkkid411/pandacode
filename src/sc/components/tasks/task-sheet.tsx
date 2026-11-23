@@ -94,6 +94,9 @@ function buildExecutionPolicy(enabled: boolean, stages: {
   }
 }
 
+// Hub: a PandaCode task saves its title, description, agent and project only; other fields are hidden.
+const HUB_HIDDEN = { display: 'none' } as const
+
 export function TaskSheet() {
   const router = useRouter()
   const open = useAppStore((s) => s.taskSheetOpen)
@@ -597,7 +600,7 @@ export function TaskSheet() {
           </div>
         )}
 
-        <div className="mb-8">
+        <div className="mb-8" style={HUB_HIDDEN}>
           <SectionLabel>Execution</SectionLabel>
           <div className="rounded-[14px] border border-white/[0.06] bg-surface p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -949,7 +952,7 @@ export function TaskSheet() {
         })()}
 
         {/* Comments (with input — adding comments from view mode is useful) */}
-        <div className="mb-8">
+        <div className="mb-8" style={HUB_HIDDEN}>
           <SectionLabel>Comments {editing.comments?.length ? `(${editing.comments.length})` : ''}</SectionLabel>
 
           {editing.comments && editing.comments.length > 0 && (
@@ -1001,6 +1004,7 @@ export function TaskSheet() {
             </button>
           )}
           <button
+            hidden /* Hub: no structured sessions */
             onClick={() => setStructuredSessionOpen(true)}
             className="flex-1 py-3.5 rounded-[14px] border border-accent-bright/20 bg-accent-bright/10 text-accent-bright text-[15px] font-600 cursor-pointer hover:bg-accent-bright/14 transition-all"
             style={{ fontFamily: 'inherit' }}
@@ -1055,7 +1059,7 @@ export function TaskSheet() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Detailed task instructions... Use @AgentName to auto-assign"
+          placeholder="What should the agent do?"
           rows={4}
           className={`${inputClass} resize-y min-h-[100px]`}
           style={{ fontFamily: 'inherit' }}
@@ -1072,7 +1076,7 @@ export function TaskSheet() {
       )}
 
       {/* Priority */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Priority <span className="normal-case tracking-normal font-normal text-text-3">(optional)</span></SectionLabel>
         <div className="flex flex-wrap gap-2">
           {([['', 'None', 'bg-surface border-white/[0.06] text-text-2'],
@@ -1097,7 +1101,7 @@ export function TaskSheet() {
       </div>
 
       {/* Images */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Images <span className="normal-case tracking-normal font-normal text-text-3">(optional — reference designs, mockups, etc.)</span></SectionLabel>
         {images.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-3">
@@ -1126,7 +1130,8 @@ export function TaskSheet() {
         </label>
       </div>
 
-      <div className="mb-8">
+      {/* Hub: a task is handed to an agent before it starts. */}
+      <div className="mb-8" style={editing && editing.status !== 'backlog' ? HUB_HIDDEN : undefined}>
         <SectionLabel>Agent</SectionLabel>
         <AgentPickerList
           agents={agentList}
@@ -1135,8 +1140,8 @@ export function TaskSheet() {
         />
       </div>
 
-      {/* Project (optional) */}
-      <div className="mb-8">
+      {/* Project (optional). Hub: set when the task is made; PandaCode does not move tasks. */}
+      <div className="mb-8" style={editing ? HUB_HIDDEN : undefined}>
         <SectionLabel>Project <span className="normal-case tracking-normal font-normal text-text-3">(optional)</span></SectionLabel>
         <div className="flex flex-wrap gap-2">
           <button
@@ -1167,7 +1172,7 @@ export function TaskSheet() {
       </div>
 
       {/* Directory (optional) */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Directory <span className="normal-case tracking-normal font-normal text-text-3">(optional — project to work in)</span></SectionLabel>
         <DirBrowser
           value={cwd || null}
@@ -1184,7 +1189,7 @@ export function TaskSheet() {
         />
       </div>
 
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Execution Workspace</SectionLabel>
         {editing ? (
           <div className="rounded-[14px] border border-white/[0.06] bg-surface p-4 space-y-3">
@@ -1276,7 +1281,7 @@ export function TaskSheet() {
       </div>
 
       {/* Tags */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Tags <span className="normal-case tracking-normal font-normal text-text-3">(optional)</span></SectionLabel>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -1316,7 +1321,7 @@ export function TaskSheet() {
       </div>
 
       {/* Dependencies */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Blocked By <span className="normal-case tracking-normal font-normal text-text-3">(tasks that must complete first)</span></SectionLabel>
         {/* Selected blockers as removable chips */}
         {blockedBy.length > 0 && (
@@ -1401,7 +1406,7 @@ export function TaskSheet() {
       </div>
 
       {/* Due Date */}
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Due Date <span className="normal-case tracking-normal font-normal text-text-3">(optional)</span></SectionLabel>
         <input
           type="date"
@@ -1412,7 +1417,7 @@ export function TaskSheet() {
         />
       </div>
 
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Quality Gate</SectionLabel>
         <p className="text-[12px] text-text-3 mb-3">
           Checks that must pass before this task can be marked completed.
@@ -1484,7 +1489,7 @@ export function TaskSheet() {
         </div>
       </div>
 
-      <div className="mb-8">
+      <div className="mb-8" style={HUB_HIDDEN}>
         <SectionLabel>Execution Policy</SectionLabel>
         <div className="p-4 rounded-[14px] border border-white/[0.06] bg-surface">
           <button
@@ -1629,7 +1634,7 @@ export function TaskSheet() {
 
       {/* Comments */}
       {editing && (
-        <div className="mb-8">
+        <div className="mb-8" style={HUB_HIDDEN}>
           <SectionLabel>Comments {editing.comments?.length ? `(${editing.comments.length})` : ''}</SectionLabel>
 
           {editing.comments && editing.comments.length > 0 && (
@@ -1681,7 +1686,7 @@ export function TaskSheet() {
               Open Session
             </button>
           )}
-          {editing && (
+          {false && editing && ( // Hub: no structured sessions
             <button onClick={() => setStructuredSessionOpen(true)} className="py-3.5 px-6 rounded-[14px] border border-accent-bright/20 bg-transparent text-accent-bright text-[15px] font-600 cursor-pointer hover:bg-accent-bright/10 transition-all" style={{ fontFamily: 'inherit' }}>
               {activeStructuredRunId ? 'Run Another Session' : 'Run Structured Session'}
             </button>

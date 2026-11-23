@@ -182,3 +182,31 @@ test('agents: any installed harness; skills, slash commands, MCP servers and a w
   await expect.poll(async () => (await calls(page, 'bot_set_capabilities')).map(c => [c.args.skills, c.args.mcp])).toEqual([[['deploy', 'agent-firefox'], ['github']]]);
   await expect.poll(async () => (await calls(page, 'bot_set_work_project')).map(c => c.args.projectId)).toEqual(['p1']);
 });
+
+test('task board: PandaCode tasks by stage; a new task handed to an agent starts with its brief, then waits for review', async ({ page }) => {
+  await open(page, '/tasks');
+  await expect(page.getByText('Task Board', { exact: true })).toBeVisible();
+  for (const column of ['Backlog', 'Running', 'Review', 'Failed']) await expect(page.getByText(column, { exact: true }).first()).toBeVisible();
+  for (const gone of ['Queued', 'Cancelled', 'Blocked', 'Overdue']) await expect(page.getByText(gone, { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Import GitHub', { exact: true })).toBeHidden();
+  await expect(page.getByText('Fix the playlist scout').first()).toBeVisible(); // answered, so it waits for review
+  await expect(page.getByText('Old archived chat')).toHaveCount(0); // settled: behind Show Archived
+
+  await page.getByRole('button', { name: '+ New Task' }).click();
+  for (const gone of ['Priority', 'Images', 'Tags', 'Due Date', 'Quality Gate', 'Execution Policy']) await expect(page.getByText(gone, { exact: true })).toBeHidden();
+  await page.getByPlaceholder('e.g. Run full site audit').fill('Caption the vlog');
+  await page.getByRole('button', { name: /Chief of Staff/ }).first().click();
+  await page.getByRole('button', { name: 'pandacode', exact: true }).click();
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-task-new.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'create_board_task')).map(c => [c.args.projectId, c.args.provider, c.args.title])).toEqual([['p1', 'claude', 'Caption the vlog']]);
+  await expect.poll(async () => (await calls(page, 'bot_assign_task')).map(c => c.args.botId)).toEqual(['b1']);
+
+  const card = page.locator('[draggable]').filter({ hasText: 'Caption the vlog' });
+  await card.hover();
+  await card.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'send_message')).at(-1)?.args.text).toBe('Caption the vlog\n\nBot brief: you are Chief of Staff.');
+  const statusOf = (title: string) => page.evaluate(async t => Object.values(await (await fetch('/api/tasks')).json() as Record<string, any>).find(x => x.title === t)?.status, title);
+  await expect.poll(() => statusOf('Caption the vlog')).toBe('completed'); // the Review column
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-task-board.png`, fullPage: true });
+});

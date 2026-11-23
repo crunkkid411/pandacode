@@ -3,8 +3,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Activity, ExternalLink, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/stores/use-app-store'
-import { useNavigate } from '@/lib/app/navigation'
 import { useUpdateTaskMutation } from '@/features/tasks/queries'
+import { api } from '@/lib/app/api-client'
+import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { AgentAvatar } from '@/components/agents/agent-avatar'
 import { timeAgo } from '@/lib/time-format'
@@ -50,8 +51,6 @@ export function TaskCard({
 }: TaskCardProps) {
   const setEditingTaskId = useAppStore((s) => s.setEditingTaskId)
   const setTaskSheetOpen = useAppStore((s) => s.setTaskSheetOpen)
-  const setCurrentAgent = useAppStore((s) => s.setCurrentAgent)
-  const navigateTo = useNavigate()
   const updateTaskMutation = useUpdateTaskMutation()
   const [dragging, setDragging] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
@@ -112,12 +111,10 @@ export function TaskCard({
     await updateTaskMutation.mutateAsync({ id: task.id, patch: { status: 'archived' } })
   }
 
+  // Hub: View opens the task's own conversation in PandaCode's main window.
   const handleViewSession = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (task.agentId) {
-      void setCurrentAgent(task.agentId)
-      navigateTo('agents')
-    }
+    void api('POST', `/tasks/${encodeURIComponent(task.id)}/open`).catch((err: unknown) => toast.error(err instanceof Error ? err.message : String(err)))
   }
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -361,7 +358,7 @@ export function TaskCard({
               opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-500/20"
             style={{ fontFamily: 'inherit' }}
           >
-            Queue
+            Start
           </button>
         )}
 
