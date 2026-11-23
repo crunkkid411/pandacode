@@ -1,18 +1,14 @@
 'use client'
 
-import { ProjectList } from '@/components/projects/project-list'
-import { ProjectDetail } from '@/components/projects/project-detail'
+// Hub: Jordan's PandaCode project folders with their agents and chats (src/sc-hub/sessions-page.tsx).
+// SwarmClaw's own project records (objectives, heartbeats, credentials) have no store in the Hub.
 import { MainContent } from '@/components/layout/main-content'
+import { HubProjects } from '../../../sc-hub/sessions-page'
 
 export default function ProjectsPage() {
   return (
     <MainContent>
-      <div className="flex-1 flex h-full min-w-0">
-        <div className="w-[280px] shrink-0 border-r border-white/[0.06] flex flex-col">
-          <ProjectList />
-        </div>
-        <ProjectDetail />
-      </div>
+      <HubProjects />
     </MainContent>
   )
 }

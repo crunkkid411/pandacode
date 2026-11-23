@@ -24,7 +24,7 @@ export const VIEW_LABELS: Record<AppView, string> = {
   logs: 'Logs',
   extensions: 'Extensions',
   usage: 'Usage',
-  runs: 'Runs',
+  runs: 'Sessions',
   autonomy: 'Autonomy',
   settings: 'Settings',
   projects: 'Projects',

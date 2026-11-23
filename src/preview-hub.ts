@@ -15,9 +15,9 @@ const tasks: Task[] = [
 
 // Chats: PandaCode's own chat commands, as the Hub window calls them.
 const now = Date.now();
-const chats: Chat[] = [
-  { id: 'c1', title: 'Fix the playlist scout', provider: 'claude', model: 'default', status: 'idle', archived: false, createdAt: now - 9e6, updatedAt: now - 9e6, lastResponseAt: now - 3_600_000 },
-  { id: 'c2', title: 'Write the shorts captions', provider: 'opencode', model: 'deepseek', status: 'running', archived: false, createdAt: now - 8e6, updatedAt: now - 8e6, lastResponseAt: now - 60_000 },
+const chats: (Chat & { projectId?: string })[] = [
+  { id: 'c1', title: 'Fix the playlist scout', provider: 'claude', model: 'default', status: 'idle', projectId: 'p1', archived: false, createdAt: now - 9e6, updatedAt: now - 9e6, lastResponseAt: now - 3_600_000 },
+  { id: 'c2', title: 'Write the shorts captions', provider: 'opencode', model: 'deepseek', status: 'running', projectId: 'p1', archived: false, createdAt: now - 8e6, updatedAt: now - 8e6, lastResponseAt: now - 60_000 },
   { id: 'c3', title: 'Old archived chat', provider: 'claude', model: 'default', status: 'idle', archived: true, createdAt: now - 9e7, updatedAt: now - 9e7, lastResponseAt: now - 9e7 },
 ];
 const taskLinks: Record<string, string> = {}; // task -> bot (bot_tasks)
@@ -224,7 +224,7 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     return { ...item } as T;
   }
   if (command === 'capabilities_inventory') return { entries: [{ harness: 'claude', kind: 'mcp server', name: 'github', source: 'Claude Code settings' }, { harness: 'opencode', kind: 'mcp server', name: 'github', source: 'OpenCode config' }] } as T;
-  if (command === 'list_projects') return [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }] as T;
+  if (command === 'list_projects') return [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }, { id: 'pold', name: 'Hub check (delete me)', path: 'C:/Users/x/PandaCode Bots/hub-check', addedOrder: 3 }] as T;
   if (command === 'bot_project_ids') return ['pb1'] as T;
   if (command === 'bot_set_work_project') { const b = botById(args.botId); b.workProject = args.projectId ?? ''; return { ...b } as T; }
   if (command === 'bot_detail' || command.startsWith('bot_schedule_') || command === 'bot_run_schedule_now') return invokeBotSchedules(command, args) as T;

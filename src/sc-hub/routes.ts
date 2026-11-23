@@ -7,15 +7,19 @@ import { boardTasks, createBoardTask, settleDone, updateBoardTask } from './boar
 import { JOB_PREFIX, jobBoardTasks, startJob } from './jobs-md';
 import { parseInbox } from './install-list';
 import { inboxItems, type InboxItem, type InboxSession, type Seen } from './inbox-facts';
+import { projectRows, sessionRows, type PcProject } from './sessions-facts';
 import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
 import { chatCommands, forwardMentions, slashParts } from './chat-commands';
+
+/** Bot workspaces live in "PandaCode Bots" (bots.rs); a deleted bot's folder stays listed, so the path is matched too. */
+const BOT_FOLDER = /[\\/]PandaCode Bots[\\/]/i;
 
 /** PandaCode projects an agent can work in (bots' own workspaces left out). */
 async function projects(call: Call) {
   const [list, botFolders] = await Promise.all([call<{ id: string; name: string; path: string }[]>('list_projects'), call<string[]>('bot_project_ids')]);
   const own = new Set(botFolders);
-  return Object.fromEntries(list.filter(p => !own.has(p.id) && !isChatProject(p)).map(p => [p.id, { id: p.id, name: p.name, description: p.path, createdAt: 0, updatedAt: 0 }]));
+  return Object.fromEntries(list.filter(p => !own.has(p.id) && !isChatProject(p) && !BOT_FOLDER.test(p.path)).map(p => [p.id, { id: p.id, name: p.name, description: p.path, createdAt: 0, updatedAt: 0 }]));
 }
 
 /** MCP servers already set up in his harnesses; a bot names the ones it may use. */
@@ -274,6 +278,23 @@ async function hubInbox(call: Call): Promise<InboxItem[]> {
   });
 }
 
+/** Sessions page: every live PandaCode chat; Projects page: his project folders with their chats and agents. */
+async function hubSessions(call: Call) {
+  const [sessions, bots, links, list, botFolders] = await Promise.all([
+    call<InboxSession[]>('list_sessions'), listBots(call), call<Record<string, string>>('bot_task_links'),
+    call<PcProject[]>('list_projects'), call<string[]>('bot_project_ids'),
+  ]);
+  const own = new Set(botFolders);
+  const folders = list.filter(p => !own.has(p.id) && !isChatProject(p) && !BOT_FOLDER.test(p.path));
+  const people = bots.map(b => ({ id: b.id, name: b.name, seed: botAgent(b).avatarSeed ?? null, desktopSession: b.desktopSession, projectId: b.projectId }));
+  const rows = sessionRows(sessions, list, people, links, {
+    stateOf: chatState,
+    seedFor: s => mascotSeed(mascotKind(s.provider, s.model), s.provider, '', 0, ''),
+    nameFor: p => HARNESSES[p]?.name ?? p,
+  });
+  return { rows, projects: projectRows(folders, rows, people) };
+}
+
 /** A board card is a PandaCode task, or a JOBS.md job (which can only be handed to an agent). */
 const updateAnyTask = (call: Call, id: string, patch: Partial<BoardTask>) =>
   id.startsWith(JOB_PREFIX) ? startJob(call, id, patch, createBoardTask) : updateBoardTask(call, id, patch);
@@ -434,6 +455,12 @@ export const routes: Route[] = [
   { method: 'POST', path: /^\/hub-installs\/open$/, run: async ({ call, body }) => { await call('hub_open_link', { url: (body as { url?: string })?.url ?? '' }); return { ok: true }; } },
   // Inbox: agent replies Jordan hasn't read, agents waiting on him, failures (inbox-facts.ts).
   { method: 'GET', path: /^\/hub-inbox$/, run: ({ call }) => hubInbox(call) },
+  // Sessions and Projects (sessions-facts.ts). Stop works on the whole selection.
+  { method: 'GET', path: /^\/hub-sessions$/, run: ({ call }) => hubSessions(call) },
+  { method: 'POST', path: /^\/hub-sessions\/stop$/, run: async ({ call, body }) => {
+    for (const id of ((body ?? {}) as { ids?: string[] }).ids ?? []) await call('stop_session', { sessionId: id });
+    return hubSessions(call);
+  } },
   { method: 'POST', path: /^\/hub-inbox\/read$/, run: async ({ call, body }) => {
     await call('hub_inbox_mark_read', { ids: ((body ?? {}) as { ids?: string[] }).ids ?? [] });
     return hubInbox(call);

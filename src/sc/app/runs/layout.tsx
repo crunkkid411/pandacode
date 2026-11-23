@@ -1,16 +1,9 @@
 'use client'
 
-import { SidebarPanelShell } from '@/components/layout/sidebar-panel-shell'
 import { MainContent } from '@/components/layout/main-content'
-import { RunList } from '@/components/runs/run-list'
 
+// Hub: no side list. SwarmClaw's run list needs its own server; the page is every PandaCode chat
+// (src/sc-hub/sessions-page.tsx).
 export default function RunsLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <SidebarPanelShell title="Runs">
-        <RunList />
-      </SidebarPanelShell>
-      <MainContent>{children}</MainContent>
-    </>
-  )
+  return <MainContent>{children}</MainContent>
 }

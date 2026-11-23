@@ -446,3 +446,30 @@ test('look: rail, side panel and page are different grays (no purple tint); text
   const claude = page.getByRole('button', { name: 'Claude Code', exact: true });
   await expect.poll(() => claude.evaluate(e => e.innerHTML)).toContain('crispEdges'); // Clawd
 });
+
+test('sessions: every live chat with its state as color and word; Ctrl+click picks two; Stop stops the working one; Open opens each', async ({ page }) => {
+  await open(page, '/runs');
+  await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible();
+  const list = page.getByRole('list', { name: 'Sessions' });
+  await expect(list.getByRole('button')).toHaveCount(3); // two chats + the agent's own thread; the archived chat is left out
+  await expect(list.getByRole('button').first()).toContainText('Working'); // working before done
+  await list.getByRole('button', { name: /Write the shorts captions/ }).click();
+  await list.getByRole('button', { name: /Fix the playlist scout/ }).click({ modifiers: ['Control'] });
+  await expect(page.getByText('2 picked')).toBeVisible();
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args.sessionId)).toEqual(['c2']);
+  await page.getByRole('button', { name: /Open in PandaCode \(2\)/ }).click();
+  await expect.poll(async () => (await calls(page, 'overlay_open_task')).map(c => c.args.sessionId).sort()).toEqual(['c1', 'c2']);
+  await page.getByRole('button', { name: /^Failed 1$/ }).click();
+  await expect(list.getByRole('button')).toHaveCount(1);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-sessions.png`, fullPage: true });
+});
+
+test('projects: his project folders (bot workspaces left out) with their chats', async ({ page }) => {
+  await open(page, '/projects');
+  const projects = page.getByRole('region', { name: 'Projects' });
+  await expect(projects.getByRole('button')).toHaveCount(1);
+  await expect(projects.getByText('pandacode', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Project' }).getByRole('list', { name: 'Sessions' }).getByRole('button')).toHaveCount(2);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-projects.png`, fullPage: true });
+});
