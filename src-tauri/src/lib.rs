@@ -5,6 +5,7 @@ mod agents_dock;
 mod hub;
 mod hub_org;
 mod hub_skills;
+mod hub_templates;
 mod hub_tools;
 mod hub_voice;
 mod agent_usage;
@@ -4140,6 +4141,9 @@ pub fn run() {
                     // Skills panel: Jordan's own skill catalog.
                     hub_skills::hub_skills_list,
                     hub_skills::hub_skills_rebuild,
+                    // New-agent form: agent templates (opencompany, Claude-Extras, plugins, Hermes bots).
+                    hub_templates::hub_agent_templates,
+                    hub_templates::hub_agent_template,
                     // Voice panel: start / stop Jordan's voice agent.
                     hub_voice::hub_voice_status,
                     hub_voice::hub_voice_start,

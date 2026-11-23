@@ -107,6 +107,38 @@ test('agents: + Agent opens the SwarmClaw agent form and saves a new PandaCode b
   await expect(page.getByText('Thumbnail Maker').first()).toBeVisible();
 });
 
+test('agents: Start from a template fills the form; a Hermes bot template makes a Hermes agent', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Start from a template' }).click();
+  await expect(page.getByText('3 agent templates on this PC', { exact: false })).toBeVisible();
+  await page.getByPlaceholder(/Search: writer/).fill('scout');
+  await expect(page.getByText('Writer', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /scout/ }).click();
+  await expect(page.getByPlaceholder('e.g. SEO Researcher')).toHaveValue('scout');
+  await expect(page.getByPlaceholder('What does this agent do?')).toHaveValue('You are the Scout');
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-template.png`, fullPage: true });
+  await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => [c.args.input.name, c.args.input.provider, c.args.input.instructions])).toEqual([['scout', 'hermes', 'Prompt of scout']]);
+});
+
+test('agents: the skills list shows the ones made for him before anything is typed', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('button', { name: /Advanced Settings/ }).click();
+  await expect(page.getByRole('button', { name: 'agent-firefox', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'video-rules', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '/deploy', exact: true })).toHaveCount(0);
+});
+
+test('agents page with no agents says how to make one instead of spinning', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__hubNoBots = true; });
+  await open(page, '/agents');
+  await expect(page.getByRole('heading', { name: 'No agents yet' })).toBeVisible();
+  await page.getByRole('button', { name: 'Make an agent' }).click();
+  await expect(page.getByRole('button', { name: 'Start from a template' })).toBeVisible();
+});
+
 test('agents: Config tab edits an agent and saves it to the bot without moving it on the Org Chart', async ({ page }) => {
   await open(page, '/agents/b1');
   await page.getByRole('button', { name: 'config', exact: true }).click();

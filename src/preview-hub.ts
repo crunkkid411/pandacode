@@ -94,9 +94,9 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
       if (!w.__hubHoldRunning) setTimeout(() => { messages[c.id].push({ id: nextId++, role: 'assistant', content: `Done: ${args.text}`, createdAt: Date.now() }); c.status = 'idle'; c.lastResponseAt = Date.now(); if ((c as any).taskStage) (c as any).taskStage = 'review'; }, 300);
       return undefined;
     }
-    case 'bots_list': return bots.map(b => ({ ...b }));
+    case 'bots_list': return (window as any).__hubNoBots ? [] : bots.map(b => ({ ...b }));
     case 'bot_set_paused': { const b = botById(args.botId); b.paused = Boolean(args.paused); return { ...b }; }
-    case 'bot_create': { if (!['claude', 'opencode', 'codex', 'qwen'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b: MockBot = { ...profile, ...args.input, id: `b${nextId++}`, paused: false, nextHeartbeatAt: null, lastMessage: null, org: {}, createdAt: Date.now(), updatedAt: Date.now() }; bots.push(b); return { ...b }; }
+    case 'bot_create': { if (!['claude', 'opencode', 'codex', 'qwen', 'hermes'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b: MockBot = { ...profile, ...args.input, id: `b${nextId++}`, paused: false, nextHeartbeatAt: null, lastMessage: null, org: {}, createdAt: Date.now(), updatedAt: Date.now() }; bots.push(b); return { ...b }; }
     case 'bot_update': { if (!['claude', 'opencode', 'codex', 'qwen'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b = botById(args.botId); Object.assign(b, args.input, { updatedAt: Date.now() }); return { ...b }; }
     case 'bot_delete': { bots.splice(bots.indexOf(botById(args.botId)), 1); return undefined; }
     case 'bot_set_org': { const b = botById(args.botId); if (args.org.parentId === b.id) throw new Error('A bot cannot report to itself or to a bot that reports to it.'); b.org = { ...args.org }; return { ...b }; }
@@ -162,6 +162,17 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { kind: 'command', name: 'deploy', description: 'Ships a build', places: ['OpenCode'], path: 'C:/oc/deploy.md', ours: false },
     { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
   ] as T;
+  if (command === 'hub_agent_templates') return [
+    { path: 'C:/hermes/profiles/scout/SOUL.md', name: 'scout', description: 'You are the Scout', source: 'Hermes bot', provider: 'hermes' },
+    { path: 'X:/oc/media_company/agents/writer.toml', name: 'Writer', description: 'Write and edit articles.', source: 'opencompany · media company', provider: '' },
+    { path: 'C:/extras/agency-agents/marketing/seo.md', name: 'SEO Specialist', description: 'Ranks pages', source: 'Claude-Extras · agency-agents', provider: '' },
+  ] as T;
+  if (command === 'hub_agent_template') {
+    const all = invokeHub<any[]>('hub_agent_templates', {});
+    const t = all.find(x => x.path === args.path);
+    if (!t) throw new Error('That template is no longer there.');
+    return { name: t.name, description: t.description, prompt: `Prompt of ${t.name}`, provider: t.provider } as T;
+  }
   if (command === 'usage_ledger') {
     const h = Math.floor(Date.now() / 3600_000);
     return { scannedAt: Date.now(), models: [{ provider: 'claude', name: 'Claude Opus 5.5' }, { provider: 'codex', name: 'GPT-6 Luna' }], rows: [[h, 0, 1000, 50000, 200, 300, 0, 0], [h - 24, 1, 400, 0, 0, 100, 0, 0], [h - 48, 0, 2000, 0, 0, 500, 0, 0]] } as T;

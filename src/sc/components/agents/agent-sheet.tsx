@@ -21,6 +21,8 @@ import { copyTextToClipboard } from '@/lib/clipboard'
 import { SectionLabel } from '@/components/shared/section-label'
 import { AdvancedSettingsSection } from '@/components/shared/advanced-settings-section'
 import { SoulLibraryPicker } from './soul-library-picker'
+import { AgentTemplatePicker } from '../../../sc-hub/agent-template-picker'
+import { scProvider } from '../../../sc-hub/bot-agents'
 import { HintTip } from '@/components/shared/hint-tip'
 import { StatusDot } from '@/components/ui/status-dot'
 import { resolveStoredOllamaMode } from '@/lib/ollama-mode'
@@ -306,6 +308,7 @@ export function AgentSheet() {
 
   const soulFileRef = useRef<HTMLInputElement>(null)
   const [soulLibraryOpen, setSoulLibraryOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const promptFileRef = useRef<HTMLInputElement>(null)
   const importFileRef = useRef<HTMLInputElement>(null)
   const lastAutoSyncedModelsKeyRef = useRef<string | null>(null)
@@ -1116,7 +1119,9 @@ export function AgentSheet() {
 
   // Whether this provider needs a connection test before saving.
   // Only CLI providers (no remote connection) skip the test.
-  const needsTest = !providerNeedsKey && !NON_LANGGRAPH_PROVIDER_IDS.has(provider)
+  // Hub: every harness offered here is one PandaCode found installed (list_providers), and SwarmClaw's
+  // /setup/check-provider has no Hub answer, so the test blocked saving Hermes, Kimi, Kilo, Vibe... agents.
+  const needsTest = false && !providerNeedsKey && !NON_LANGGRAPH_PROVIDER_IDS.has(provider)
 
   const [saving, setSaving] = useState(false)
 
@@ -1225,6 +1230,14 @@ export function AgentSheet() {
             </span>
           </div>
           <p className="text-[14px] text-text-3">Set up an agent with sensible defaults, then expand advanced settings if you need deeper control.</p>
+          {/* Hub: fill the form from one of his agent templates (opencompany, Claude-Extras, plugins, Hermes bots) */}
+          {!editing && (
+            <button type="button" onClick={() => setTemplatesOpen(true)}
+              className="mt-4 px-4 py-2.5 rounded-[12px] border border-accent-bright/30 bg-accent-soft text-accent-bright text-[14px] font-600 cursor-pointer hover:brightness-110 transition-all"
+              style={{ fontFamily: 'inherit' }}>
+              Start from a template
+            </button>
+          )}
         </div>
       </div>
 
@@ -2770,7 +2783,7 @@ export function AgentSheet() {
             Skills &amp; slash commands
           </label>
           {/* Hub: his catalog has every skill, slash command and agent file on the PC, so search it; picks show first. */}
-          <p className="text-[12px] text-text-3/60 mb-3">From every harness on this PC. The ones you pick are given to this agent.</p>
+          <p className="text-[12px] text-text-3/60 mb-3">{Object.keys(dynamicSkills).length.toLocaleString()} from every harness and plugin on this PC. The ones made for you show first; type to search the rest. The ones you pick are given to this agent.</p>
           <input
             type="search"
             value={skillQuery}
@@ -2781,8 +2794,11 @@ export function AgentSheet() {
           />
           <div className="flex flex-wrap gap-2">
             {Object.values(dynamicSkills)
-              .filter((s) => skillIds.includes(s.id) || (skillQuery.trim().length > 0 && `${s.name} ${s.description ?? ''}`.toLowerCase().includes(skillQuery.trim().toLowerCase())))
-              .sort((a, b) => Number(skillIds.includes(b.id)) - Number(skillIds.includes(a.id)))
+              // Hub: with nothing typed, picks + the ones made for him show (the list was blank until he typed).
+              .filter((s) => skillIds.includes(s.id) || (skillQuery.trim().length > 0
+                ? skillQuery.trim().toLowerCase().split(/\s+/).every((w) => `${s.name} ${s.description ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(w))
+                : s.tags?.includes('made for you')))
+              .sort((a, b) => Number(skillIds.includes(b.id)) - Number(skillIds.includes(a.id)) || Number(!!b.tags?.includes('made for you')) - Number(!!a.tags?.includes('made for you')))
               .slice(0, 60)
               .map((s) => {
               const active = skillIds.includes(s.id)
@@ -3077,6 +3093,16 @@ export function AgentSheet() {
       open={soulLibraryOpen}
       onClose={() => setSoulLibraryOpen(false)}
       onSelect={(s) => setSoul(s)}
+    />
+    <AgentTemplatePicker
+      open={templatesOpen}
+      onClose={() => setTemplatesOpen(false)}
+      onPick={(t) => {
+        setName(t.name)
+        setDescription(t.description)
+        setSystemPrompt(t.prompt)
+        if (t.provider) setProvider(scProvider(t.provider) as AgentProviderId)
+      }}
     />
     </>
   )
