@@ -35,6 +35,8 @@ const bots: MockBot[] = [
   { ...profile, id: 'b2', name: 'Inbox Sorter', role: 'Sorts saved links', provider: 'opencode', model: 'deepseek', paused: true, heartbeatMinutes: 30, nextHeartbeatAt: null, lastMessage: null, org: { parentId: 'b1', swarmRole: 'worker', onChart: true } },
   { ...profile, id: 'b3', name: 'Clip Finder', role: 'Finds clips in streams', provider: 'claude', model: 'default', paused: false, heartbeatMinutes: 0, nextHeartbeatAt: null, lastMessage: null, org: {} },
 ];
+// PandaCode's skills library: agent-firefox was imported from its folder before.
+const library: any[] = [{ id: 'agent-firefox', name: 'agent-firefox', kind: 'skill', description: '', source: { kind: 'folder', location: 'C:/skills/agent-firefox' } }];
 const botById = (id: string) => { const b = bots.find(x => x.id === id); if (!b) throw new Error('This bot no longer exists.'); return b; };
 // Bot schedules (bots/schedule.rs): Chief of Staff checks the inbox every weekday at 08:15.
 const botSchedules: any[] = [
@@ -68,10 +70,11 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
   switch (command) {
     case 'list_sessions': return chats.map(c => ({ ...c }));
     case 'list_providers': if (w.__hubSlowProviders && !w.__hubSlowDone) { w.__hubSlowDone = true; return new Promise(r => setTimeout(() => r(invokeHub('list_providers', args)), 800)); }
-      return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }, ...((window as any).__hubBroken ? [{ id: 'cursor-broken', name: 'Broken Agent', installed: true }] : [])];
+      return [{ id: 'claude', name: 'Claude Code', installed: true }, { id: 'opencode', name: 'OpenCode', installed: true }, { id: 'gemini', name: 'Gemini CLI', installed: true }, { id: 'qwen', name: 'Qwen Code', installed: true }, { id: 'cursor', name: 'Cursor', installed: false }, ...((window as any).__hubBroken ? [{ id: 'cursor-broken', name: 'Broken Agent', installed: true }] : [])];
     case 'get_messages': return { messages: (messages[args.sessionId] ?? []).map(m => ({ ...m })), hasOlder: false };
-    case 'list_provider_models': if (args.provider === 'cursor-broken') throw new Error('Cursor exited before returning models' + String.fromCharCode(10) + 'Details: more');
-      return args.provider === 'claude' ? [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] : [{ id: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }];
+    case 'list_provider_models': if (args.provider === 'gemini') throw new Error('ACP startup timed out after 60 seconds.');
+      if (args.provider === 'cursor-broken') throw new Error('Cursor exited before returning models' + String.fromCharCode(10) + 'Details: more');
+      return args.provider === 'claude' ? [{ id: 'default', name: 'Default' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }] : args.provider === 'qwen' ? [{ id: 'qwen3-coder', name: 'Qwen3 Coder' }] : [{ id: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }];
     case 'model_routing_route': return w.__hubNoRoute ? { pick: null, difficulty: 3, category: 'implementation', profiler: 'onnx' } : { pick: { provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5', pSuccess: 0.8 }, difficulty: 5, category: 'implementation', profiler: 'onnx' };
     case 'chat_create': {
       const c: Chat = { id: `c${nextId++}`, title: 'New chat', provider: args.provider, model: args.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null };
@@ -91,8 +94,8 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
     }
     case 'bots_list': return bots.map(b => ({ ...b }));
     case 'bot_set_paused': { const b = botById(args.botId); b.paused = Boolean(args.paused); return { ...b }; }
-    case 'bot_create': { if (!['claude', 'opencode', 'codex'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b: MockBot = { ...profile, ...args.input, id: `b${nextId++}`, paused: false, nextHeartbeatAt: null, lastMessage: null, org: {}, createdAt: Date.now(), updatedAt: Date.now() }; bots.push(b); return { ...b }; }
-    case 'bot_update': { if (!['claude', 'opencode', 'codex'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b = botById(args.botId); Object.assign(b, args.input, { updatedAt: Date.now() }); return { ...b }; }
+    case 'bot_create': { if (!['claude', 'opencode', 'codex', 'qwen'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b: MockBot = { ...profile, ...args.input, id: `b${nextId++}`, paused: false, nextHeartbeatAt: null, lastMessage: null, org: {}, createdAt: Date.now(), updatedAt: Date.now() }; bots.push(b); return { ...b }; }
+    case 'bot_update': { if (!['claude', 'opencode', 'codex', 'qwen'].includes(args.input.provider)) throw new Error('Choose a harness and model for the bot.'); const b = botById(args.botId); Object.assign(b, args.input, { updatedAt: Date.now() }); return { ...b }; }
     case 'bot_delete': { bots.splice(bots.indexOf(botById(args.botId)), 1); return undefined; }
     case 'bot_set_org': { const b = botById(args.botId); if (args.org.parentId === b.id) throw new Error('A bot cannot report to itself or to a bot that reports to it.'); b.org = { ...args.org }; return { ...b }; }
     case 'bot_set_capabilities': { const b = botById(args.botId); b.skills = args.skills; b.mcp = args.mcp; return { ...b }; }
@@ -150,6 +153,18 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
   if (command === 'hub_voice_status') return { running: w.__hubVoice ?? null } as T;
   if (command === 'hub_voice_start') { if (w.__hubVoice && w.__hubVoice !== args.kind) throw new Error('Another voice is already on. Stop it first.'); w.__hubVoice = args.kind; return { running: args.kind } as T; }
   if (command === 'hub_voice_stop') { w.__hubVoice = null; return { running: null } as T; }
+  // Skills library, MCP servers and projects for the agent form.
+  if (command === 'skills_list') return library.map(i => ({ ...i })) as T;
+  if (command === 'skills_import_folder') {
+    const id = String(args.path).split(/[\\/]/).pop()!.replace(/\.md$/i, '').toLowerCase();
+    const item = { id, name: id, kind: 'skill', description: '', source: { kind: 'folder', location: args.path } };
+    library.push(item);
+    return { ...item } as T;
+  }
+  if (command === 'capabilities_inventory') return { entries: [{ harness: 'claude', kind: 'mcp server', name: 'github', source: 'Claude Code settings' }, { harness: 'opencode', kind: 'mcp server', name: 'github', source: 'OpenCode config' }] } as T;
+  if (command === 'list_projects') return [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }] as T;
+  if (command === 'bot_project_ids') return ['pb1'] as T;
+  if (command === 'bot_set_work_project') { const b = botById(args.botId); b.workProject = args.projectId ?? ''; return { ...b } as T; }
   if (command === 'bot_detail' || command.startsWith('bot_schedule_') || command === 'bot_run_schedule_now') return invokeBotSchedules(command, args) as T;
   if (!command.startsWith('hub_')) return invokeChats(command, args) as T;
   if (command === 'hub_org') return [

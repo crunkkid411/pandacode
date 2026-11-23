@@ -1232,6 +1232,9 @@ impl Store {
             "devin",
             "zcode",
             "hermes",
+            "gemini",
+            "qwen",
+            "vibe",
         ]
         .contains(&provider)
         {
@@ -1418,6 +1421,9 @@ impl Store {
             "devin",
             "zcode",
             "hermes",
+            "gemini",
+            "qwen",
+            "vibe",
         ]
         .contains(&provider)
         {
@@ -2015,6 +2021,9 @@ fn handoff_from_provider(content: &str) -> Option<String> {
                 | "devin"
                 | "zcode"
                 | "hermes"
+                | "gemini"
+                | "qwen"
+                | "vibe"
         )
     };
     (known(from) && known(to)).then(|| from.to_owned())

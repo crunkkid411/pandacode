@@ -1,6 +1,25 @@
 // What each SwarmClaw API path means on Jordan's PC. Every answer comes from a Hub Rust command.
 import type { Agent, ProviderInfo, Schedule, Skill } from '../sc/types';
 import { botSchedules, createBotSchedule, preview, PREFIX, scheduleOwner, scSchedule } from './bot-schedules';
+import { loadLibrary } from './bot-skills';
+import { isChatProject } from '../chats';
+
+/** PandaCode projects an agent can work in (bots' own workspaces left out). */
+async function projects(call: Call) {
+  const [list, botFolders] = await Promise.all([call<{ id: string; name: string; path: string }[]>('list_projects'), call<string[]>('bot_project_ids')]);
+  const own = new Set(botFolders);
+  return Object.fromEntries(list.filter(p => !own.has(p.id) && !isChatProject(p)).map(p => [p.id, { id: p.id, name: p.name, description: p.path, createdAt: 0, updatedAt: 0 }]));
+}
+
+/** MCP servers already set up in his harnesses; a bot names the ones it may use. */
+async function mcpServers(call: Call) {
+  const inv = await call<{ entries: { kind: string; name: string; harness: string; source: string }[] }>('capabilities_inventory', { taskId: null });
+  const out: Record<string, unknown> = {};
+  for (const e of inv.entries.filter(x => x.kind === 'mcp server')) {
+    out[e.name] ??= { id: e.name, name: e.name, transport: 'stdio', command: '', description: `From ${e.source}`, createdAt: 0, updatedAt: 0 };
+  }
+  return out;
+}
 import { work, type Ledger } from '../hub/usage-facts';
 import { chatState, visibleChats, type Chat } from '../hub/chats-facts';
 import { botAgent, botThread, createBotAgent, deleteBotAgent, listBots, pcProvider, scProvider, updateBotAgent } from './bot-agents';
@@ -15,6 +34,7 @@ const NAMES: Record<string, string> = { opencode: 'OpenCode', hermes: 'Hermes Ag
  *  he placed on it; live terminal sessions are not agents and are not on it. */
 export async function botAgents(call: Call): Promise<Record<string, Agent>> {
   const pinned = new Set(saved().pinned);
+  await loadLibrary(call); // so each agent's skills show as picked
   return Object.fromEntries((await listBots(call)).map(b => [b.id, { ...botAgent(b), pinned: pinned.has(b.id) }]));
 }
 
@@ -112,7 +132,21 @@ async function skills(call: Call, command = 'hub_skills_list'): Promise<Record<s
 /** Agents installed on this PC, with the models each one offers. */
 async function providers(call: Call): Promise<ProviderInfo[]> {
   const list = await call<HubProvider[]>('list_providers');
-  return list.filter(p => p.installed).map(p => ({ id: scProvider(p.id) as ProviderInfo['id'], name: p.name, models: (p.models ?? []).map(m => m.id), requiresApiKey: false, requiresEndpoint: false }));
+  // supportsModelDiscovery: the model box asks discover-models below for the harness's full list.
+  // Gemini CLI's free sign-in is shut for individuals (Google: "migrate to the Antigravity suite"), so it is not offered.
+  return list.filter(p => p.installed && p.id !== 'gemini').map(p => ({ id: scProvider(p.id) as ProviderInfo['id'], name: p.name, models: (p.models ?? []).map(m => m.id), requiresApiKey: false, requiresEndpoint: false, supportsModelDiscovery: true }));
+}
+
+/** Every model a harness offers (OpenCode, Kilo and Hermes reach any API provider set up in them). */
+async function discoverModels(call: Call, scId: string, force: boolean) {
+  const id = pcProvider(scId);
+  const base = { providerId: scId, cached: !force, fetchedAt: Date.now(), cacheTtlMs: 300_000, supportsDiscovery: true };
+  try {
+    const models = await call<{ id: string }[]>('list_provider_models', { provider: id, force });
+    return { ...base, ok: true, models: models.map(m => m.id) };
+  } catch (e) {
+    return { ...base, ok: false, models: [], message: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 const RANGE_HOURS: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
@@ -208,6 +242,11 @@ export const routes: Route[] = [
     }
     return Object.keys(rest).length ? updateBotAgent(call, match[1], rest) : { ok: true };
   } },
+  { method: 'GET', path: /^\/projects$/, run: ({ call }) => projects(call) },
+  { method: 'GET', path: /^\/mcp-servers$/, run: ({ call }) => mcpServers(call) },
+  { method: 'GET', path: /^\/providers\/([^/]+)\/discover-models$/, run: ({ call, match, query }) => discoverModels(call, decodeURIComponent(match[1]), query.get('force') === '1') },
+  // The form saves the discovered list back; the engine already caches it, so nothing to store.
+  { method: 'PUT', path: /^\/providers\/([^/]+)\/models$/, run: async () => ({ ok: true }) },
   { method: 'POST', path: /^\/agents$/, run: ({ call, body }) => createBotAgent(call, (body ?? {}) as Partial<Agent>) },
   { method: 'DELETE', path: /^\/agents\/([^/]+)$/, run: ({ call, match }) => deleteBotAgent(call, match[1]) },
   // Org Chart drags and team edits: one save per agent.

@@ -4103,6 +4103,13 @@ pub fn run() {
                     bots::bot_message,
                     bots::bot_set_capabilities,
                     bots::bot_set_org,
+                    bots::work_project::bot_set_work_project,
+                    // Agent form: skills from any folder, MCP servers, projects.
+                    skills::skills_list,
+                    skills::skills_import_folder,
+                    capabilities::capabilities_inventory,
+                    list_projects,
+                    bots::bot_project_ids,
                     // SwarmClaw's Schedules page: each agent's own schedules.
                     bots::schedule::bot_schedule_create,
                     bots::schedule::bot_schedule_set_enabled,
@@ -4281,7 +4288,7 @@ pub fn run() {
                 bots::failover::bot_failover_decide,
                 bots::failover::bot_failover_pending,
                 bots::failover::bot_model_switches,
-                bots::bot_set_capabilities, bots::bot_set_org, bots::bot_assign_task, bots::bot_task_links, bots::bot_task_brief,
+                bots::bot_set_capabilities, bots::bot_set_org, bots::work_project::bot_set_work_project, bots::bot_assign_task, bots::bot_task_links, bots::bot_task_brief,
                 bots::schedule::bot_schedule_create,
                 bots::schedule::bot_schedule_set_enabled,
                 bots::schedule::bot_schedule_delete,

@@ -347,6 +347,9 @@ fn cache() -> &'static HashMap<&'static str, CacheSlot> {
             "devin",
             "zcode",
             "hermes",
+            "gemini",
+            "qwen",
+            "vibe",
         ]
         .into_iter()
         .map(|id| (id, CacheSlot::default()))
@@ -619,6 +622,7 @@ async fn fetch_provider(provider: &str, env: &[(String, String)]) -> Usage {
         "devin" => Usage::empty(provider, "unsupported", "Devin does not expose plan limits through its ACP server. Check usage in your Devin account settings."),
         "zcode" => Usage::empty(provider, "unsupported", "ZCode does not expose plan usage. Check usage in ZCode itself."),
         "hermes" => Usage::empty(provider, "unsupported", "Hermes Agent does not expose usage limits through its ACP server. Check your LLM provider's dashboard."),
+        "gemini" | "qwen" | "vibe" => Usage::empty(provider, "unsupported", "This CLI does not report usage limits. Check its own account page."),
         _ => Usage::empty(provider, "unsupported", "Usage limits are not available for this agent."),
     };
     if result.dashboard_url.is_none() {

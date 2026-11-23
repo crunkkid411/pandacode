@@ -166,6 +166,9 @@ fn validate_selection(selection: &ModelSelection) -> Result<()> {
         "devin",
         "zcode",
         "hermes",
+        "gemini",
+        "qwen",
+        "vibe",
     ]
     .contains(&selection.provider.as_str())
         || selection.model.trim().is_empty()

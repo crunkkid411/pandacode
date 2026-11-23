@@ -99,7 +99,8 @@ fn workspace_skills(app: &tauri::AppHandle, store: &Store, bot: &Bot, session_id
     let (Ok(task), Ok(root), Ok(library)) = (store.session(session_id), store.workspace_root(&bot.project_id, None), crate::skills::library(app)) else { return Default::default() };
     let harness = task.provider;
     let mut skipped = library.sync_project(&harness, &root, &bot.skills);
-    if crate::skills::scoped::has_skill_folder(&harness) {
+    // Skill files live in the bot's own workspace; a chat in its work project gets them as text.
+    if crate::skills::scoped::has_skill_folder(&harness) && task.project_id == bot.project_id {
         let installed = library.project_active(&harness, &root).into_iter().filter(|id| bot.skills.contains(id)).collect::<Vec<_>>();
         return (brief::skills("", &installed, &skipped), skipped);
     }
@@ -112,6 +113,19 @@ fn workspace_skills(app: &tauri::AppHandle, store: &Store, bot: &Bot, session_id
 fn steer_while_busy(bot: &Bot, image_ids: &[String], sender_id: &str) -> bool {
     bot.while_working == "steer" && image_ids.is_empty()
         && !sender_id.starts_with("bot:") && !sender_id.starts_with("channel:")
+}
+
+/// The folder a bot thread runs in: the bot's own workspace or the work project it was given.
+/// Anything else means the chat was moved by hand, so the turn is refused.
+fn thread_project(store: &Store, bot: &Bot, session_id: &str) -> Result<String> {
+    let project = store.session(session_id)?.project_id;
+    if project == bot.project_id || (!bot.work_project.is_empty() && project == bot.work_project) { Ok(project) } else { Err("Task moved to a different project. Read its details again.".into()) }
+}
+
+fn state_project(app: &tauri::AppHandle, bot: &Bot, session_id: &str) -> Option<String> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().ok()?;
+    Some(thread_project(&store, bot, session_id).unwrap_or_else(|_| bot.project_id.clone()))
 }
 
 fn image_attachments(image_ids: &[String]) -> Value {
@@ -137,16 +151,16 @@ async fn start_or_queue(app: &tauri::AppHandle, bot: &Bot, session_id: &str, tex
     }
     super::failover::remember_images(session_id, &image_ids);
     super::failover::before_turn(app, bot, session_id);
-    let (is_team, request) = {
+    let (is_team, request, project) = {
         let store = state.store.lock().map_err(|e| e.to_string())?;
         // The bot message or channel assignment this turn carries is now the one running.
         let request = super::shared_channels::promote_taken(&store, session_id, &text);
-        (crate::architect::load(&store, session_id)?.is_some(), request)
+        (crate::architect::load(&store, session_id)?.is_some(), request, thread_project(&store, bot, session_id)?)
     };
     let launched = if is_team {
-        crate::architect::architect_start_in_project(app.clone(), state, session_id.to_owned(), text, Some(image_ids), Some(bot.project_id.clone())).await
+        crate::architect::architect_start_in_project(app.clone(), state, session_id.to_owned(), text, Some(image_ids), Some(project.clone())).await
     } else {
-        crate::launch_task_in_project(app.clone(), state, session_id.to_owned(), Some(text), Some(image_ids), Some(bot.project_id.clone())).await
+        crate::launch_task_in_project(app.clone(), state, session_id.to_owned(), Some(text), Some(image_ids), Some(project)).await
     };
     if launched.is_err() {
         super::failover::clear_images(session_id);
@@ -331,7 +345,7 @@ pub(crate) async fn run_finished(app: &tauri::AppHandle, session_id: &str, succe
         super::failover::before_turn(app, &bot, session_id);
         let (context, image_ids) = queued_prompt(&entry.attachments);
         super::failover::remember_images(session_id, &image_ids);
-        let launched = crate::launch_task_in_project(app.clone(), app.state::<AppState>(), session_id.to_owned(), Some(format!("{}{context}", entry.text)), Some(image_ids), Some(bot.project_id.clone())).await;
+        let launched = crate::launch_task_in_project(app.clone(), app.state::<AppState>(), session_id.to_owned(), Some(format!("{}{context}", entry.text)), Some(image_ids), state_project(app, &bot, session_id)).await;
         // A channel Stop that landed between the take and the launch stops the turn it missed.
         let stopped = launched.is_ok() && delivery.as_ref().is_some_and(|request| state.store.lock().is_ok_and(|store| super::shared_channels::delivery_stopped(&store, request)));
         if stopped {
@@ -506,7 +520,7 @@ mod tests {
             project_id: "project".into(), provider: "claude".into(), model: "sonnet".into(), mode: "ask".into(), heartbeat_minutes: 0,
             next_heartbeat_at: None, paused: false, memory_version: 0, notify_channel_id: None, notify_thread: None, created_at: 0, updated_at: 0,
             color: String::new(), reasoning_effort: String::new(), backup_models: Vec::new(), fallback_mode: "ask".into(), notify: true,
-            while_working: while_working.into(), show_plan: false, soul: String::new(), skills: Vec::new(), mcp: Vec::new(), org: Default::default(),
+            while_working: while_working.into(), show_plan: false, soul: String::new(), skills: Vec::new(), mcp: Vec::new(), org: Default::default(), work_project: String::new(),
         }
     }
 

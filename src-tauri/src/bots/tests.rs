@@ -846,3 +846,24 @@ fn org_chart_place_saves_refuses_loops_and_briefs_the_team() {
     // A profile edit keeps the chart place.
     assert_eq!(update(&f.store, &editor.id, &input("Editor")).unwrap().org.parent_id.as_deref(), Some(ceo.id.as_str()));
 }
+
+#[test]
+fn work_project_moves_the_hub_chat_and_refuses_another_bots_workspace() {
+    let f = fixture();
+    let bot = create(&f.store, &input("Writer"), &f.root).unwrap();
+    let other = create(&f.store, &input("Editor"), &f.root).unwrap();
+    let folder = f.root.join("real-project");
+    std::fs::create_dir_all(&folder).unwrap();
+    let project = f.store.add_project(&folder).unwrap();
+    let (first, _) = thread_session(&f.store, &bot, DESKTOP, DESKTOP, "Writer · You").unwrap();
+    assert_eq!(f.store.session(&first).unwrap().project_id, bot.project_id, "starts in its own workspace");
+    let moved = super::work_project::set(&f.store, &bot.id, Some(&project.id)).unwrap();
+    assert_eq!(moved.work_project, project.id);
+    let (second, created) = thread_session(&f.store, &moved, DESKTOP, DESKTOP, "Writer · You").unwrap();
+    assert!(created && second != first, "a fresh chat in the new folder");
+    assert_eq!(f.store.session(&second).unwrap().project_id, project.id);
+    assert!(f.store.session(&first).is_ok(), "the old chat stays");
+    assert!(super::work_project::set(&f.store, &bot.id, Some(&other.project_id)).is_err(), "not another bot's workspace");
+    assert!(super::work_project::set(&f.store, &bot.id, Some("gone")).is_err());
+    assert_eq!(super::work_project::set(&f.store, &bot.id, None).unwrap().work_project, "", "cleared back to its own workspace");
+}

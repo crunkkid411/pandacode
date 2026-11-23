@@ -65,6 +65,8 @@ interface ExtensionToolInfo {
   description: string
 }
 
+const HUB_HIDDEN_SECTIONS = new Set(['Context & Tool Access', 'Voice & Autonomy', 'Memory & Intelligence', 'Continuity', 'Safety & Limits', 'Configuration History', 'Utilities'])
+
 function SectionCard({
   title,
   description,
@@ -78,6 +80,8 @@ function SectionCard({
   children: React.ReactNode
   className?: string
 }) {
+  // Hub: Advanced Settings sections a bot does not save stay hidden.
+  if (HUB_HIDDEN_SECTIONS.has(title)) return null
   return (
     <section className={`mb-8 rounded-[20px] border border-white/[0.06] bg-surface/70 p-5 sm:p-6 ${className}`}>
       <div className="mb-5 flex items-start justify-between gap-4">
@@ -234,6 +238,7 @@ export function AgentSheet() {
   const [externalTools, setExternalTools] = useState<ExtensionToolInfo[]>([])
   const [skills, setSkills] = useState<string[]>([])
   const [skillIds, setSkillIds] = useState<string[]>([])
+  const [skillQuery, setSkillQuery] = useState('') // Hub: search box over his skills catalog
   const [mcpServerIds, setMcpServerIds] = useState<string[]>([])
   const [mcpDisabledTools, setMcpDisabledTools] = useState<string[]>([])
   const [mcpTools, setMcpTools] = useState<Record<string, { name: string; description: string }[]>>({})
@@ -2119,7 +2124,7 @@ export function AgentSheet() {
         </SectionCard>
       )}
 
-      {/* Hub: none of the advanced settings are saved on a bot yet */ false && (!WORKER_ONLY_PROVIDER_IDS.has(provider) || MCP_INJECTION_PROVIDER_IDS.has(provider)) && (
+      {/* Hub: only Project, Skills and MCP servers inside are saved on a bot; the rest is hidden */ (!WORKER_ONLY_PROVIDER_IDS.has(provider) || MCP_INJECTION_PROVIDER_IDS.has(provider)) && (
       <AdvancedSettingsSection
         open={showAdvancedSettings}
         onToggle={() => setShowAdvancedSettings((current) => !current)}
@@ -2376,7 +2381,7 @@ export function AgentSheet() {
           </p>
         </div>
       )}
-      <div className="mb-8">
+      <div className="mb-8" style={{ display: 'none' }} /* Hub: bots use backup models, set elsewhere */>
         <label className="flex items-center gap-2 font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
           Model Routing <HintTip text="Route this agent through a provider/model pool instead of a single fixed model. The base provider remains the default when no route matches." />
         </label>
@@ -2515,7 +2520,7 @@ export function AgentSheet() {
           <p className="text-[11px] text-text-3/70 mt-2">No route pool yet. Add one if this agent should switch between cheaper, stronger, or gateway-specific models.</p>
         )}
       </div>
-      <div>
+      <div style={{ display: 'none' }} /* Hub: a bot's reach is set by its approval mode */>
         <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Filesystem Access</label>
         <select
           value={filesystemScope}
@@ -2608,8 +2613,8 @@ export function AgentSheet() {
         </div>
       )}
 
-      {/* Filesystem Access */}
-      <div className="mb-8">
+      {/* Filesystem Access. Hub: hidden; a bot's reach is set by its approval mode */}
+      <div className="mb-8" style={{ display: 'none' }}>
         <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Filesystem Access</label>
         <select
           value={filesystemScope}
@@ -2682,7 +2687,7 @@ export function AgentSheet() {
       )}
 
       {/* Native capability provider note — not shown for OpenClaw (covered in connection status) */}
-      {hasNativeCapabilities && !openclawEnabled && (
+      {/* Hub: no LangGraph note */ false && hasNativeCapabilities && !openclawEnabled && (
         <div className="mb-8 p-4 rounded-[14px] bg-white/[0.02] border border-white/[0.06]">
           <p className="text-[13px] text-text-3">
             {provider === 'claude-cli'
@@ -2710,8 +2715,8 @@ export function AgentSheet() {
         </div>
       )}
 
-      {/* Skills — discovered from ~/.claude/skills/ */}
-      {provider === 'claude-cli' && (
+      {/* Skills — discovered from ~/.claude/skills/. Hub: hidden; the skills list below covers every harness */}
+      {false && provider === 'claude-cli' && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em]">
@@ -2762,11 +2767,24 @@ export function AgentSheet() {
       {Object.keys(dynamicSkills).length > 0 && (
         <div className="mb-8">
           <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
-            Pinned Skills <span className="normal-case tracking-normal font-normal text-text-3">(from Skills manager)</span>
+            Skills &amp; slash commands
           </label>
-          <p className="text-[12px] text-text-3/60 mb-3">All ready local skills are discoverable by default. Pin skills here only when they should stay in this agent&apos;s prompt as always-on guidance.</p>
+          {/* Hub: his catalog has every skill, slash command and agent file on the PC, so search it; picks show first. */}
+          <p className="text-[12px] text-text-3/60 mb-3">From every harness on this PC. The ones you pick are given to this agent.</p>
+          <input
+            type="search"
+            value={skillQuery}
+            onChange={(e) => setSkillQuery(e.target.value)}
+            placeholder="Search skills and slash commands"
+            className={`${inputClass} mb-3`}
+            style={{ fontFamily: 'inherit' }}
+          />
           <div className="flex flex-wrap gap-2">
-            {Object.values(dynamicSkills).map((s) => {
+            {Object.values(dynamicSkills)
+              .filter((s) => skillIds.includes(s.id) || (skillQuery.trim().length > 0 && `${s.name} ${s.description ?? ''}`.toLowerCase().includes(skillQuery.trim().toLowerCase())))
+              .sort((a, b) => Number(skillIds.includes(b.id)) - Number(skillIds.includes(a.id)))
+              .slice(0, 60)
+              .map((s) => {
               const active = skillIds.includes(s.id)
               return (
                 <button
@@ -2779,7 +2797,7 @@ export function AgentSheet() {
                   style={{ fontFamily: 'inherit' }}
                   title={s.description || s.filename}
                 >
-                  {s.name}
+                  {s.tags?.includes('command') ? `/${s.name}` : s.name}
                 </button>
               )
             })}
@@ -2817,7 +2835,7 @@ export function AgentSheet() {
       )}
 
       {/* MCP Tools — per-tool enable/disable toggles */}
-      {mcpServerIds.length > 0 && Object.keys(mcpTools).length > 0 && (
+      {/* Hub: per-tool toggles are not saved */ false && mcpServerIds.length > 0 && Object.keys(mcpTools).length > 0 && (
         <div className="mb-8">
           <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">
             MCP Tools
@@ -2863,7 +2881,7 @@ export function AgentSheet() {
         </div>
       )}
 
-      <div className="mb-2">
+      <div className="mb-2" style={{ display: 'none' }} /* Hub: capability tags are not saved on a bot */>
         <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Capabilities</label>
         <p className="text-[12px] text-text-3/60 mb-3">Optional tags that describe what this agent is especially good at.</p>
         {capabilities.length > 0 && (

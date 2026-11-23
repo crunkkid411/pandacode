@@ -311,6 +311,9 @@ const catalogs: Record<ProviderId, ProviderModel[]> = {
     ['glm-5-2', 'GLM-5.2 High', ['none', 'high', 'max'], 'high'],
     ['fusion-claude-opus-5-5-medium-sidekick-swe-2-medium', 'Fusion (Claude Opus 5.5 Medium + SWE-2 Medium)', ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
   ] as [string, string, string[], string][]).map(([id, name, efforts, effort]) => ({ id, name, description: id === 'glm-5-2' ? 'Text only' : '', reasoningEfforts: efforts.map(value => ({ id: value, name: value === 'xhigh' ? 'Extra high' : value[0].toUpperCase() + value.slice(1), description: '' })), ...(effort ? { defaultReasoningEffort: effort } : {}) })),
+  gemini: [{ id: 'default', name: 'Default', description: 'Uses the model set in Gemini CLI.' }],
+  qwen: [{ id: 'default', name: 'Default', description: 'Uses the model set in Qwen Code.' }],
+  vibe: [{ id: 'default', name: 'Default', description: 'Uses the model set in Mistral Vibe.' }],
   hermes: [
     { id: 'default', name: 'Default model', description: 'Uses the model configured in Hermes (~/.hermes/config.yaml).' },
     { id: 'nous/hermes-3-llama-3.1-405b', name: 'Hermes 3 Llama 3.1 405B', description: 'Flagship open-weights model fine-tuned by Nous Research.' },

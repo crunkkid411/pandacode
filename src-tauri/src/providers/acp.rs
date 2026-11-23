@@ -73,6 +73,7 @@ pub(super) fn configure(command: &mut Command, config: &RunConfig) {
         "kilo" => super::kilo::configure(command),
         "devin" => super::devin::configure(command),
         "hermes" => super::hermes::configure(command, config),
+        "gemini" | "qwen" | "vibe" => super::acp_cli::configure(command, config),
         "antigravity" => antigravity_args(command),
         _ => {
             #[cfg(target_os = "linux")]

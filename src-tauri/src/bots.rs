@@ -5,6 +5,7 @@
 
 mod brief;
 pub(crate) mod org;
+pub(crate) mod work_project;
 pub(crate) use org::Org;
 pub(crate) mod channels;
 pub(crate) mod failover;
@@ -54,7 +55,8 @@ CREATE TABLE IF NOT EXISTS bots(
   show_plan INTEGER NOT NULL DEFAULT 0 CHECK(show_plan IN (0,1)),
   skills TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(skills)),
   mcp TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(mcp)),
-  org TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(org)));
+  org TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(org)),
+  work_project TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS bot_memories(
   id TEXT PRIMARY KEY,
   bot_id TEXT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
@@ -175,7 +177,7 @@ CREATE INDEX IF NOT EXISTS bot_messages_source ON bot_messages(source_session_id
 
 /// Profile columns added after the bots table first shipped (schema 25). Fresh databases get
 /// them from `SCHEMA`; `upgrade` adds whichever are missing, so it is safe to run every start.
-const ADDED_COLUMNS: [(&str, &str); 8] = [
+const ADDED_COLUMNS: [(&str, &str); 9] = [
     ("color", "TEXT NOT NULL DEFAULT ''"),
     ("reasoning_effort", "TEXT NOT NULL DEFAULT ''"),
     ("backup_models", "TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(backup_models))"),
@@ -184,6 +186,7 @@ const ADDED_COLUMNS: [(&str, &str); 8] = [
     ("while_working", "TEXT NOT NULL DEFAULT 'queue'"),
     ("show_plan", "INTEGER NOT NULL DEFAULT 0 CHECK(show_plan IN (0,1))"),
     ("org", "TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(org))"),
+    ("work_project", "TEXT NOT NULL DEFAULT ''"),
 ];
 
 pub(crate) fn upgrade(db: &rusqlite::Connection) -> Result<()> {
@@ -247,6 +250,8 @@ pub struct Bot {
     pub mcp: Vec<String>,
     /// The bot's place on the Hub's Org Chart (`Org`); `{}` when it has none.
     pub org: Org,
+    /// A project the bot works in (its Hub chat runs there), or empty for its own workspace.
+    pub work_project: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -309,7 +314,7 @@ pub struct Thread {
     pub updated_at: i64,
 }
 
-const BOT_COLUMNS: &str = "id,name,role,instructions,goals,avatar,project_id,provider,model,mode,heartbeat_minutes,next_heartbeat_at,paused,memory_version,notify_channel_id,notify_thread,created_at,updated_at,color,reasoning_effort,backup_models,fallback_mode,notify,while_working,show_plan,soul,skills,mcp,org";
+const BOT_COLUMNS: &str = "id,name,role,instructions,goals,avatar,project_id,provider,model,mode,heartbeat_minutes,next_heartbeat_at,paused,memory_version,notify_channel_id,notify_thread,created_at,updated_at,color,reasoning_effort,backup_models,fallback_mode,notify,while_working,show_plan,soul,skills,mcp,org,work_project";
 
 fn bot_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Bot> {
     Ok(Bot {
@@ -342,6 +347,7 @@ fn bot_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Bot> {
         skills: serde_json::from_str(&r.get::<_, String>(26)?).unwrap_or_default(),
         mcp: serde_json::from_str(&r.get::<_, String>(27)?).unwrap_or_default(),
         org: serde_json::from_str(&r.get::<_, String>(28)?).unwrap_or_default(),
+        work_project: r.get(29)?,
     })
 }
 
@@ -421,6 +427,9 @@ fn known_provider(provider: &str) -> bool {
             | "devin"
             | "zcode"
             | "hermes"
+            | "gemini"
+            | "qwen"
+            | "vibe"
     )
 }
 
@@ -769,7 +778,7 @@ pub(crate) fn thread_session(store: &Store, bot: &Bot, channel_id: &str, externa
         }
         store.db.execute("DELETE FROM bot_threads WHERE session_id=?1", [session]).map_err(|e| e.to_string())?;
     }
-    let task = store.create_session(&bot.project_id, &bot.provider, &bot.model, &bot.mode)?;
+    let task = store.create_session(work_project::thread_project(store, bot), &bot.provider, &bot.model, &bot.mode)?;
     store.update(&task.id, Some(clean(title, 120)), None, None, None)?;
     if !bot.reasoning_effort.is_empty() {
         store.db.execute("UPDATE sessions SET reasoning_effort=?2 WHERE id=?1", params![task.id, bot.reasoning_effort]).map_err(|e| e.to_string())?;

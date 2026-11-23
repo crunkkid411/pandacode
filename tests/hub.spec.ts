@@ -211,7 +211,7 @@ test('ask: the router picks the agent and model, and the chat starts with the wo
   await expect(page.getByRole('status')).toHaveText('Sonnet 5.5 in Claude Code');
   const route = (await calls(page, 'model_routing_route'))[0].args;
   expect(route.text).toBe('Fix the login bug');
-  expect(route.pool).toEqual([{ provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }, { provider: 'opencode', model: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }]);
+  expect(route.pool).toEqual([{ provider: 'claude', model: 'claude-sonnet-5-5', name: 'Sonnet 5.5' }, { provider: 'opencode', model: 'freellmapi/deepseek-v4-flash', name: 'DeepSeek V4 Flash' }]); // sample Qwen model has no rating
   expect((await calls(page, 'chat_create')).at(-1)!.args).toEqual({ provider: 'claude', model: 'claude-sonnet-5-5', mode: 'full' });
   expect((await calls(page, 'send_message')).at(-1)!.args.text).toBe('Fix the login bug');
   await expect(page.getByRole('textbox', { name: 'What do you want done?' })).toHaveValue('');

@@ -3,6 +3,7 @@
 // Each bot reads as a SwarmClaw Agent; SwarmClaw's create / edit / delete / org-chart saves go back
 // to the bot commands in src-tauri/src/bots.rs. Fields bots do not have are not saved.
 import type { Agent } from '../sc/types';
+import { catalogIds, libraryNames, loadLibrary } from './bot-skills';
 
 type Call = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -11,7 +12,7 @@ export interface Bot {
   id: string; name: string; role: string; instructions: string; goals: string; soul: string; avatar: string;
   provider: string; model: string; mode: string; heartbeatMinutes: number; paused: boolean;
   color: string; reasoningEffort: string; backupModels: unknown[]; fallbackMode: string; notify: boolean; whileWorking: string; showPlan: boolean;
-  skills: string[]; mcp: string[]; org: BotOrg; createdAt: number; updatedAt: number;
+  skills: string[]; mcp: string[]; org: BotOrg; projectId?: string; workProject?: string; createdAt: number; updatedAt: number;
   desktopSession?: string | null; lastMessage?: { at: number } | null;
 }
 
@@ -33,7 +34,7 @@ export function botAgent(b: Bot): Agent {
     avatarUrl: isImage(b.avatar) ? b.avatar : null, avatarSeed: b.id,
     role: org.swarmRole === 'coordinator' ? 'coordinator' : 'worker',
     orgChart: org.onChart ? { parentId: org.parentId ?? null, teamLabel: org.teamLabel ?? null, teamColor: org.teamColor ?? null, x: org.x ?? null, y: org.y ?? null } : null,
-    skillIds: b.skills, mcpServerIds: b.mcp,
+    skillIds: catalogIds(b.skills), mcpServerIds: b.mcp, projectId: b.workProject || undefined,
     heartbeatEnabled: b.heartbeatMinutes > 0, heartbeatIntervalSec: b.heartbeatMinutes ? b.heartbeatMinutes * 60 : null,
     heartbeatGoal: b.goals || null,
     thinkingLevel: (['minimal', 'low', 'medium', 'high'].includes(b.reasoningEffort) ? b.reasoningEffort : undefined) as Agent['thinkingLevel'],
@@ -80,16 +81,17 @@ async function apply(call: Call, bot: Bot, a: Partial<Agent>): Promise<Agent> {
   const profileKeys = ['name', 'description', 'systemPrompt', 'soul', 'provider', 'model', 'emoji', 'avatarUrl', 'heartbeatEnabled', 'heartbeatIntervalSec', 'heartbeatGoal', 'thinkingLevel'] as const;
   if (profileKeys.some(k => k in a)) await call('bot_update', { botId: bot.id, input: input(bot, a) });
   if ('orgChart' in a || 'role' in a) await call('bot_set_org', { botId: bot.id, org: orgOf(a.orgChart, a.role, bot.org) });
-  // ponytail: bots take PandaCode library skill names (lowercase-with-dashes); other picks are not saved.
-  const slugs = (ids: string[] | undefined) => ids?.filter(s => /^[a-z0-9-]{1,64}$/.test(s));
-  if ('skillIds' in a || 'mcpServerIds' in a) await call('bot_set_capabilities', { botId: bot.id, skills: slugs(a.skillIds) ?? bot.skills, mcp: a.mcpServerIds ?? bot.mcp });
+  if ('skillIds' in a || 'mcpServerIds' in a) await call('bot_set_capabilities', { botId: bot.id, skills: a.skillIds ? await libraryNames(call, a.skillIds) : bot.skills, mcp: a.mcpServerIds ?? bot.mcp });
+  // Project: the folder its Hub chat works in; none = its own workspace.
+  if ('projectId' in a && (a.projectId || '') !== (bot.workProject || '')) await call('bot_set_work_project', { botId: bot.id, projectId: a.projectId || null });
   if (typeof a.disabled === 'boolean' && a.disabled !== bot.paused) await call('bot_set_paused', { botId: bot.id, paused: a.disabled });
+  await loadLibrary(call);
   return botAgent(await oneBot(call, bot.id));
 }
 
 export async function createBotAgent(call: Call, a: Partial<Agent>): Promise<Agent> {
   const made = await call<Bot>('bot_create', { input: input({}, a) });
-  return apply(call, { ...made, desktopSession: null }, { orgChart: a.orgChart, role: a.role, skillIds: a.skillIds, mcpServerIds: a.mcpServerIds, disabled: a.disabled });
+  return apply(call, { ...made, desktopSession: null }, { orgChart: a.orgChart, role: a.role, skillIds: a.skillIds, mcpServerIds: a.mcpServerIds, projectId: a.projectId, disabled: a.disabled });
 }
 
 export const updateBotAgent = async (call: Call, id: string, a: Partial<Agent>) => apply(call, await oneBot(call, id), a);

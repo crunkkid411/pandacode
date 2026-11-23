@@ -45,6 +45,7 @@ mod extra_models;
 mod github_copilot;
 mod devin;
 pub(crate) mod hermes;
+pub(crate) mod acp_cli;
 mod glm;
 mod mimo;
 mod muse;
@@ -97,7 +98,7 @@ const PREVIEW_TRUNCATED: &str = "\n[Preview truncated]";
 fn should_shrink(len: usize, capacity: usize) -> bool {
     capacity > 1024 * 1024 && len <= FRAME_KEEP / 2
 }
-pub(crate) const PROVIDERS: [(&str, &str); 19] = [
+pub(crate) const PROVIDERS: [(&str, &str); 22] = [
     ("claude", "Claude Code"),
     ("codex", "Codex"),
     ("kimi", "Kimi Code"),
@@ -117,6 +118,9 @@ pub(crate) const PROVIDERS: [(&str, &str); 19] = [
     ("devin", "Devin CLI"),
     ("zcode", "ZCode"),
     ("hermes", "Hermes Agent"),
+    ("gemini", "Gemini CLI"),
+    ("qwen", "Qwen Code"),
+    ("vibe", "Mistral Vibe"),
 ];
 
 /// Claude Code tools that only report back to a session that stays open after its turn.
@@ -546,7 +550,7 @@ pub fn validate_reasoning_effort(provider: &str, effort: Option<&str>) -> Result
     let valid = match (provider, effort) {
         (
             "claude" | "codex" | "kimi" | "glm" | "opencode" | "antigravity" | "grok" | "mimo"
-            | "pi" | "deepseek" | "commandcode" | "cline" | "kilo" | "omp" | "github-copilot" | "muse" | "devin" | "zcode" | "hermes",
+            | "pi" | "deepseek" | "commandcode" | "cline" | "kilo" | "omp" | "github-copilot" | "muse" | "devin" | "zcode" | "hermes" | "gemini" | "qwen" | "vibe",
             None,
         ) => true,
         ("claude" | "glm" | "mimo", Some(value)) => {
@@ -554,7 +558,7 @@ pub fn validate_reasoning_effort(provider: &str, effort: Option<&str>) -> Result
         }
         // The current app-server schema deliberately permits catalog-defined effort IDs.
         // Kimi's thinking option lists on/off or the model's levels (low/high/max).
-        ("codex" | "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "devin" | "zcode" | "hermes", Some(value)) => {
+        ("codex" | "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "devin" | "zcode" | "hermes" | "gemini" | "qwen" | "vibe", Some(value)) => {
             !value.is_empty()
                 && value.len() <= 64
                 && value
@@ -625,6 +629,7 @@ fn executable_name(name: &str) -> &str {
         "commandcode" => "command-code",
         "github-copilot" => "copilot",
         "hermes" => "hermes",
+        "vibe" => "vibe-acp",
         other => other,
     }
 }
@@ -991,7 +996,7 @@ pub(crate) async fn list_model_catalog(provider: &str) -> Result<Vec<ModelInfo>,
     let semaphore = &model_discovery_semaphores()[index];
     let _permit = if matches!(
         provider,
-        "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "muse" | "devin" | "zcode" | "hermes"
+        "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "muse" | "devin" | "zcode" | "hermes" | "gemini" | "qwen" | "vibe"
     ) {
         // Saving models refreshes both windows. Queue their bounded metadata
         // queries so one window does not cache incomplete ID-only fallbacks.
@@ -1024,6 +1029,7 @@ pub(crate) async fn list_model_catalog(provider: &str) -> Result<Vec<ModelInfo>,
         "devin" => devin::models(&path).await,
         "zcode" => zcode::models(&path).await,
         "hermes" => hermes::models(&path).await,
+        "gemini" | "qwen" | "vibe" => acp_cli::models(provider, &path).await,
         _ => unreachable!(),
     }
 }
@@ -1593,7 +1599,7 @@ impl Protocol {
         // not retain a second copy for the rest of a potentially long turn.
         let mut content = std::mem::take(&mut self.image_blocks);
         let mut text = std::mem::take(&mut self.config.prompt);
-        if (matches!(self.config.provider.as_str(), "grok" | "deepseek" | "muse" | "hermes") || self.plan_fallback) && self.config.mode == "plan" && !text.trim().is_empty() {
+        if (matches!(self.config.provider.as_str(), "grok" | "deepseek" | "muse" | "hermes" | "gemini" | "qwen" | "vibe") || self.plan_fallback) && self.config.mode == "plan" && !text.trim().is_empty() {
             text = format!("{}\n\n{text}", acp::READ_ONLY_PLAN_PREFIX);
         }
         if !text.trim().is_empty() {
@@ -1976,7 +1982,7 @@ impl Protocol {
                     json!({"experimentalApi":true,"requestAttestation":false});
                 request
             }
-            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" => {
+            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" | "gemini" | "qwen" | "vibe" => {
                 json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"pandacode","version":"0.1.0"}}})
             }
             _ => {
@@ -2013,7 +2019,7 @@ impl Protocol {
                 json!({"id":request["id"],"result":result})
             }
             "devin" => devin::decision(&request, approved),
-            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "hermes" => {
+            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "hermes" | "gemini" | "qwen" | "vibe" => {
                 let options = request["params"]["options"].as_array();
                 let kinds = if approved {
                     ["allow_once", "allow_always"]
@@ -2041,7 +2047,7 @@ impl Protocol {
             "codex" => {
                 json!({"id":900,"method":"turn/interrupt","params":{"threadId":self.remote_id,"turnId":self.turn_id}})
             }
-            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" => {
+            "kimi" | "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" | "gemini" | "qwen" | "vibe" => {
                 json!({"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":self.remote_id}})
             }
             _ => {
@@ -2084,7 +2090,7 @@ impl Protocol {
             "pi" | "omp" => self.pi(value).map(|step| self.steered(step)),
             "zcode" => self.zcode(value).map(|step| self.steered(step)),
             "muse" => self.muse(value),
-            "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" => self.acp(value),
+            "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" | "github-copilot" | "devin" | "hermes" | "gemini" | "qwen" | "vibe" => self.acp(value),
             _ => self.claude(value),
         }
     }
@@ -3241,7 +3247,7 @@ fn configure_command(command: &mut Command, config: &RunConfig) {
         "zcode" => zcode::configure(command),
         "muse" => muse::configure(command, config),
         "opencode" | "antigravity" | "grok" | "deepseek" | "commandcode" | "cline" | "kilo" => acp::configure(command, config),
-        "github-copilot" | "devin" | "hermes" => acp::configure(command, config),
+        "github-copilot" | "devin" | "hermes" | "gemini" | "qwen" | "vibe" => acp::configure(command, config),
         "kimi" => {
             if use_model {
                 command.args(["--model", &config.model]);
@@ -3329,6 +3335,9 @@ async fn run_inner(
         "devin",
         "zcode",
         "hermes",
+        "gemini",
+        "qwen",
+        "vibe",
     ]
     .contains(&config.provider.as_str())
     {
@@ -3518,7 +3527,7 @@ async fn run_process_with_tools(
         }
         (
             "claude" | "glm" | "mimo" | "kimi" | "opencode" | "antigravity" | "grok" | "pi"
-            | "deepseek" | "commandcode" | "cline" | "kilo" | "omp" | "github-copilot" | "muse" | "devin" | "hermes",
+            | "deepseek" | "commandcode" | "cline" | "kilo" | "omp" | "github-copilot" | "muse" | "devin" | "hermes" | "gemini" | "qwen" | "vibe",
             Some(host),
         ) => (
             None,

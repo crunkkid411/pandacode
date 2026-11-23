@@ -124,6 +124,8 @@ fn resolve(path: &Path, windows: bool) -> Result<Launch, String> {
             "command-code" | "cmdc" | "commandcode" => "command-code",
             "copilot" => "@github/copilot",
             "cline" => "cline",
+            "gemini" => "@google/gemini-cli",
+            "qwen" => "@qwen-code/qwen-code",
             "kilo" | "kilocode" => "@kilocode/cli",
             "netlify" => "netlify-cli",
             "npx" => "npm",

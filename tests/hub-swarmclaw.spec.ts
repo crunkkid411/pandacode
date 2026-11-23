@@ -97,7 +97,7 @@ test('agents: + Agent opens the SwarmClaw agent form and saves a new PandaCode b
   await page.getByPlaceholder('e.g. SEO Researcher').fill('Thumbnail Maker');
   await page.getByPlaceholder('What does this agent do?').fill('Makes thumbnail ideas');
   // Parts that would not be saved on a bot are not shown.
-  for (const hollow of ['OpenClaw', 'Can Delegate', 'Dreaming', 'Advanced Settings', 'Avatar seed (any text)']) await expect(page.getByText(hollow, { exact: true }).filter({ visible: true })).toHaveCount(0);
+  for (const hollow of ['OpenClaw', 'Can Delegate', 'Dreaming', 'Avatar seed (any text)']) await expect(page.getByText(hollow, { exact: true }).filter({ visible: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Claude Code', exact: true }).click();
   await page.getByRole('button', { name: 'Coordinator', exact: true }).click();
   await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-form.png`, fullPage: true });
@@ -157,4 +157,28 @@ test('schedules: + Schedule makes a schedule for the chosen agent', async ({ pag
   await page.getByRole('button', { name: /^(Create|Save)/ }).last().click();
   await expect.poll(async () => (await calls(page, 'bot_schedule_create')).map(c => [c.args.botId, c.args.input.title, c.args.input.kind])).toEqual([['b3', 'Daily Digest', 'daily']]);
   await expect(page.getByText('Daily Digest').first()).toBeVisible();
+});
+
+test('agents: any installed harness; skills, slash commands, MCP servers and a work project save on the bot', async ({ page }) => {
+  await open(page, '/agents/b1');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByPlaceholder('e.g. SEO Researcher').fill('Release Helper');
+  await expect(page.getByRole('button', { name: 'Gemini CLI', exact: true })).toHaveCount(0); // free sign-in shut by Google
+  await page.getByRole('button', { name: 'Qwen Code', exact: true }).click();
+  await page.getByRole('button', { name: /Advanced Settings/ }).click();
+  const search = page.getByPlaceholder('Search skills and slash commands');
+  await search.fill('deploy');
+  await page.getByRole('button', { name: '/deploy', exact: true }).click();
+  await search.fill('firefox');
+  await page.getByRole('button', { name: 'agent-firefox', exact: true }).click();
+  await page.getByRole('button', { name: 'github', exact: true }).click();
+  const project = page.locator('select').filter({ has: page.locator('option', { hasText: 'No project' }) });
+  await expect(project.locator('option')).toHaveText(['No project', 'pandacode']); // a bot's own folder is not offered
+  await project.selectOption('p1');
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-agent-skills.png`, fullPage: true });
+  await page.getByRole('button', { name: /^(Create|Test & Save)$/ }).click();
+  await expect.poll(async () => (await calls(page, 'bot_create')).map(c => c.args.input.provider)).toEqual(['qwen']);
+  await expect.poll(async () => (await calls(page, 'skills_import_folder')).map(c => c.args.path)).toEqual(['C:/oc/deploy.md']); // agent-firefox is already in the library
+  await expect.poll(async () => (await calls(page, 'bot_set_capabilities')).map(c => [c.args.skills, c.args.mcp])).toEqual([[['deploy', 'agent-firefox'], ['github']]]);
+  await expect.poll(async () => (await calls(page, 'bot_set_work_project')).map(c => c.args.projectId)).toEqual(['p1']);
 });
