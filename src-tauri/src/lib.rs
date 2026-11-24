@@ -4202,6 +4202,10 @@ pub fn run() {
                     hub_voice::hub_voice_status,
                     hub_voice::hub_voice_start,
                     hub_voice::hub_voice_stop,
+                    // The chat box's queue: a message sent while the agent works waits here.
+                    message_queue::queue_list,
+                    message_queue::queue_add,
+                    message_queue::queue_remove,
                 ];
                 return handler(invoke);
             }

@@ -604,6 +604,9 @@ export function MessageList({ messages, streaming, connectorFilter = null, loadi
       }
     })
     observer.observe(content)
+    // Hub: the view itself shrinks while Jordan dictates (the box grows, the queue and "Reply in
+    // progress" appear). Without this the newest lines slid ~200 px below the view (2026-11-24).
+    observer.observe(el)
     return () => observer.disconnect()
   }, [sessionId])
 
