@@ -86,6 +86,14 @@ const toMessages = (rows: PcMessage[]) => rows.flatMap(m =>
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+interface PcQueued { id: string; sessionId: string; position: number; text: string; createdAt: number }
+/** PandaCode's queued messages for a chat, in SwarmClaw's queue shape. */
+async function queueSnapshot(call: Call, sessionId: string) {
+  const rows = await call<PcQueued[]>('queue_list', { sessionId });
+  const items = rows.map((q, i) => ({ runId: q.id, sessionId, text: q.text, queuedAt: q.createdAt, position: i + 1 }));
+  return { sessionId, activeRunId: null, queueLength: items.length, items };
+}
+
 /** Sends one message to a PandaCode chat and streams the reply back in SwarmClaw's "data: {...}" format.
  *  PandaCode writes replies to its store, so this re-reads the chat every 1.5 s until it stops working. */
 export function chatStream(call: Call, id: string, text: string, pollMs = 1500, imageIds: string[] = []): Response {
@@ -104,6 +112,9 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500, 
           const brief = slashParts(text) ? '' : await call<string | null>('bot_task_brief', { sessionId: id }).catch(() => null) ?? '';
           await call('send_message', { sessionId: id, text: text + brief, imageIds, moodboardIds: [] });
         }
+        // The agent has the message: the reply bubble says it is working, not "Queued..." (it said
+        // "Queued..." for minutes while the agent used tools, and Jordan thought it was never sent).
+        send({ t: 'md', text: JSON.stringify({ run: { status: 'running' } }) });
         const started = Date.now();
         let shown = '', errors = 0, sawWork = false;
         while (Date.now() - started < 60 * 60_000) {
@@ -464,8 +475,26 @@ export const routes: Route[] = [
     const rows = toMessages((await call<{ messages: PcMessage[] }>('get_messages', { sessionId: match[1] })).messages);
     return [`# ${c.name}`, ...rows.map(m => `**${m.role === 'user' ? 'Jordan' : c.name}:** ${m.text}`)].join('\n\n');
   } },
-  // PandaCode has no message queue or context meter to show: an empty queue, and null hides the meter.
-  { method: 'GET', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ match }) => ({ sessionId: match[1], activeRunId: null, queueLength: 0, items: [] }) },
+  // The chat box queues a message while the agent works (Jordan, 2026-11-23: the box kept his sent
+  // prompt, because these routes were missing). PandaCode's own queue (message_queue.rs) sends it
+  // when the turn ends; an agent's thread goes through bot_message, which queues or steers.
+  { method: 'GET', path: /^\/chats\/([^/]+)\/queue$/, run: ({ call, match }) => queueSnapshot(call, match[1]) },
+  { method: 'POST', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ call, match, body }) => {
+    const id = match[1], text = String((body as { message?: string } | null)?.message ?? '').trim();
+    if (!text) throw new Error('Type a message first.');
+    const botId = await botOfThread(call, id);
+    if (botId) await call('bot_message', { botId, text, imageIds: [], moodboardIds: [] });
+    else await call('queue_add', { sessionId: id, text });
+    const snapshot = await queueSnapshot(call, id);
+    return { queued: { runId: snapshot.items.at(-1)?.runId ?? '', position: snapshot.queueLength }, snapshot };
+  } },
+  { method: 'DELETE', path: /^\/chats\/([^/]+)\/queue$/, run: async ({ call, match, body }) => {
+    const runId = (body as { runId?: string } | null)?.runId;
+    const before = await queueSnapshot(call, match[1]);
+    const gone = runId ? before.items.filter(i => i.runId === runId) : before.items;
+    for (const item of gone) await call('queue_remove', { id: item.runId });
+    return { cancelled: gone.length, snapshot: await queueSnapshot(call, match[1]) };
+  } },
   { method: 'GET', path: /^\/chats\/([^/]+)\/context-status$/, run: async () => null },
   { method: 'POST', path: /^\/agents\/([^/]+)\/thread$/, run: async ({ call, match }) => oneChat(call, await botThread(call, match[1])) },
   // Schedules: his agents' own schedules (ids "bs-...") first, then his Windows tasks.

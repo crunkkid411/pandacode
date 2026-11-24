@@ -26,6 +26,9 @@ const messages: Record<string, ChatMessage[]> = {
   c2: [{ id: 3, role: 'user', content: 'Caption the new short', createdAt: now - 70_000 }],
 };
 let nextId = 100;
+// Tests add an agent's reply text while it works, like a reply arriving bit by bit.
+(window as any).__hubSay = (sessionId: string, content: string) => (messages[sessionId] ??= []).push({ id: nextId++, role: 'assistant', content, createdAt: Date.now() });
+const queued: { id: string; sessionId: string; position: number; text: string; createdAt: number }[] = [];
 const previewProjects = [{ id: 'p1', name: 'pandacode', path: 'X:/AI-2/pandacode', addedOrder: 1 }, { id: 'pb1', name: 'Chief of Staff', path: 'C:/Bots/chief', addedOrder: 2 }, { id: 'pold', name: 'Hub check (delete me)', path: 'C:/Users/x/PandaCode Bots/hub-check', addedOrder: 3 }];
 
 // Agents: PandaCode's bots and scheduled chats.
@@ -113,10 +116,26 @@ function invokeChats(command: string, args: Record<string, any>): unknown {
     case 'bot_set_capabilities': { const b = botById(args.botId); b.skills = args.skills; b.mcp = args.mcp; return { ...b }; }
     case 'bot_desktop_thread': {
       const b = botById(args.botId);
-      if (!b.desktopSession) { const c: Chat & { projectId: string } = { id: `t-${b.id}`, projectId: 'pb1', title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id; }
+      if (!b.desktopSession) { const c: Chat & { projectId: string } = { id: `t-${b.id}`, projectId: 'pb1', title: `${b.name} · You`, provider: b.provider, model: b.model, status: 'idle', archived: false, createdAt: Date.now(), updatedAt: Date.now(), lastResponseAt: null, lastPromptAt: null }; chats.push(c); b.desktopSession = c.id;
+        // A long conversation, like the Video Editor's real one (about 290 rows), for typing-under-load tests.
+        if (w.__hubLongThread) messages[c.id] = Array.from({ length: 300 }, (_, i) => ({ id: nextId++, role: i % 2 ? 'assistant' : 'user', content: i % 2 ? `## Step ${i}
+
+Here is **a longer** reply with a list:
+
+- one \`code\` item
+- two
+
+\`\`\`ts
+const x = ${i};
+\`\`\`` : `question ${i}`, createdAt: Date.now() - (300 - i) * 60_000 })); }
       return b.desktopSession;
     }
+    // PandaCode's queue (message_queue.rs): a message to a busy agent waits for the turn to end.
+    case 'queue_list': return queued.filter(q => q.sessionId === args.sessionId).map(q => ({ ...q }));
+    case 'queue_add': { const q = { id: `q${nextId++}`, sessionId: args.sessionId, position: queued.length + 1, text: args.text, createdAt: Date.now() }; queued.push(q); return { ...q }; }
+    case 'queue_remove': { const i = queued.findIndex(q => q.id === args.id); if (i >= 0) queued.splice(i, 1); return undefined; }
     case 'bot_message': { const sid = invokeChats('bot_desktop_thread', args) as string;
+      if (chats.find(x => x.id === sid)?.status === 'running') return invokeChats('queue_add', { sessionId: sid, text: args.text });
       if (args.text === 'ASK') { asks[sid] = [{ sessionId: sid, kind: 'approval', text: 'PowerShell: cubase-read "TEST-FILE.cpr"', requestId: 'r1', data: null }]; (messages[sid] ??= []).push({ id: nextId++, role: 'user', content: 'ASK', createdAt: Date.now() }); return undefined; }
       return invokeChats('send_message', { sessionId: sid, text: args.text }); }
     case 'pending_requests': return (asks[args.sessionId] ?? []).map(r => ({ ...r }));
