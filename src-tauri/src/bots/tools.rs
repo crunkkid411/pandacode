@@ -23,7 +23,36 @@ pub(crate) fn catalog() -> Vec<Value> {
         spec("bot_cancel_schedule", "Delete one of this bot's schedules by ID (from bot_list_schedules).", json!({"scheduleId": id}), &["scheduleId"]),
         spec("bot_notify", "Message the user now, on the channel they last used (and the desktop app). Use for results, reminders, or decisions they need to make; do not use it to chat.", json!({"text": {"type":"string","maxLength":4000}}), &["text"]),
         spec("bot_message_bot", "Send a short work request to another bot by exact name or ID. The other bot works in its own desktop conversation and sends an update back here. Do not message yourself; collaboration chains stop after three bot-to-bot hops.", json!({"to":{"type":"string","maxLength":80},"text":{"type":"string","maxLength":8000}}), &["to","text"]),
+        spec("bot_create_agent", "Create a new agent in the Hub (it appears in Agents and on the Org Chart, and coordinators can hand it work at once). Follow the new-agent skill first. name must be new. instructions is the agent's full instructions. provider is a harness id (default claude); model default uses the harness default. workFolder (optional) is an existing folder its Hub chat works in. Claude Code agents start in Auto mode, others in Ask.", json!({"name":{"type":"string","maxLength":60},"role":{"type":"string","maxLength":200},"instructions":text,"provider":{"type":"string","maxLength":40},"model":{"type":"string","maxLength":200},"workFolder":{"type":"string","maxLength":1000}}), &["name","instructions"]),
     ]
+}
+
+/// The new agent's saved profile: a Hub-made agent's defaults (bot-agents.ts `input`), Claude Code in Auto.
+fn new_agent_input(args: &Value) -> super::BotInput {
+    let string = |key: &str| args[key].as_str().unwrap_or_default().trim().to_owned();
+    let provider = Some(string("provider")).filter(|p| !p.is_empty()).unwrap_or_else(|| "claude".into());
+    let model = Some(string("model")).filter(|m| !m.is_empty()).unwrap_or_else(|| "default".into());
+    let mode = if provider == "claude" { "review" } else { "ask" }.to_owned();
+    super::BotInput { name: string("name"), role: string("role"), instructions: string("instructions"), provider, model, mode, notify: Some(true), ..Default::default() }
+}
+
+/// Creates the agent, then points its Hub chat at `workFolder` when one is given.
+pub(super) fn create_agent(store: &crate::storage::Store, args: &Value, root: &std::path::Path) -> Result<Value> {
+    let input = new_agent_input(args);
+    if super::list(store)?.iter().any(|b| b.name.eq_ignore_ascii_case(input.name.trim())) {
+        return Err(format!("An agent named \"{}\" already exists. Pick another name.", input.name));
+    }
+    let folder = args["workFolder"].as_str().unwrap_or_default().trim().to_owned();
+    if !folder.is_empty() && !std::path::Path::new(&folder).is_dir() {
+        return Err(format!("The folder {folder} does not exist. Create it first, or leave workFolder empty."));
+    }
+    let bot = super::create(store, &input, root)?;
+    let bot = if folder.is_empty() { bot } else {
+        let project = store.add_project(std::path::Path::new(&folder))?;
+        super::work_project::set(store, &bot.id, Some(&project.id))?
+    };
+    let home = store.project(&bot.project_id).map(|p| p.path).unwrap_or_default();
+    Ok(json!({"id": bot.id, "name": bot.name, "provider": bot.provider, "mode": bot.mode, "ownFolder": home, "workFolder": folder}))
 }
 
 /// Bot tools act only on the bot that owns the task, so harnesses need not ask before using them.
@@ -121,6 +150,12 @@ pub(crate) async fn dispatch(app: &tauri::AppHandle, session_id: &str, name: &st
                     json!({"forgotten": true})
                 }
                 "pandacode_bot_recall" => json!({"memories": super::memories(&store, &bot.id)?}),
+                "pandacode_bot_create_agent" => {
+                    let made = create_agent(&store, args, &super::workspace_root())?;
+                    let _ = app.emit("sessions-changed", ());
+                    super::log(&store, &bot.id, "updated", &format!("Created agent {}", made["name"].as_str().unwrap_or_default()), made.clone())?;
+                    made
+                }
                 "pandacode_bot_schedule" => {
                     let input = schedule::ScheduleInput {
                         title: string("title"),

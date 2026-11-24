@@ -877,3 +877,20 @@ fn work_project_moves_the_hub_chat_and_refuses_another_bots_workspace() {
     assert!(super::work_project::set(&f.store, &bot.id, Some("gone")).is_err());
     assert_eq!(super::work_project::set(&f.store, &bot.id, None).unwrap().work_project, "", "cleared back to its own workspace");
 }
+
+#[test]
+fn create_agent_tool_makes_an_auto_claude_agent_in_its_work_folder_and_refuses_a_duplicate_name() {
+    let f = fixture();
+    let work = f.root.join("video-editor");
+    std::fs::create_dir_all(&work).unwrap();
+    let args = json!({"name": "Video Editor", "role": "Edits videos", "instructions": "Edit.", "workFolder": work.to_string_lossy()});
+    let made = super::tools::create_agent(&f.store, &args, &f.root).unwrap();
+    let bot = get(&f.store, made["id"].as_str().unwrap()).unwrap();
+    assert_eq!((bot.provider.as_str(), bot.model.as_str(), bot.mode.as_str()), ("claude", "default", "review"));
+    assert_eq!(f.store.project(&bot.work_project).unwrap().path, work.canonicalize().unwrap().to_string_lossy());
+    let again = super::tools::create_agent(&f.store, &json!({"name": "video editor", "instructions": "x"}), &f.root);
+    assert!(again.unwrap_err().contains("already exists"));
+    let missing = super::tools::create_agent(&f.store, &json!({"name": "Other", "instructions": "x", "workFolder": f.root.join("nope").to_string_lossy()}), &f.root);
+    assert!(missing.unwrap_err().contains("does not exist"));
+    assert!(super::tools::self_scoped("pandacode_bot_create_agent"));
+}
