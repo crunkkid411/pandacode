@@ -478,6 +478,46 @@ pub async fn open_hub(app: AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+/// The name a Remote Control session shows on claude.ai and the Claude app: the agent's name
+/// from its chat title ("Chief of Staff · You" -> "Chief of Staff").
+pub(crate) fn remote_control_name(title: &str) -> String {
+    let name = title.split(" · ").next().unwrap_or("").trim();
+    if name.is_empty() { "Hub chat".into() } else { name.chars().take(60).collect() }
+}
+
+/// "/remote-control" in a Hub chat. Claude Code offers /remote-control only in its own terminal
+/// window, not in the background mode the Hub runs it in, so this starts Claude Code's own
+/// `claude remote-control` in the chat's folder, in its own window (close the window to stop it).
+/// It starts in Auto (Jordan, 2026-11-23: "all Claude Code agents should start with "auto" by default").
+#[tauri::command]
+pub async fn hub_remote_control(state: tauri::State<'_, crate::AppState>, session_id: String) -> Result<String, String> {
+    let (cwd, title) = {
+        let store = state.store.lock().map_err(|e| e.to_string())?;
+        let task = store.session(&session_id)?;
+        (store.workspace_root(&task.project_id, Some(&session_id))?, task.title.clone())
+    };
+    let claude = crate::providers::executable("claude").ok_or("Claude Code is not installed.")?;
+    let name = remote_control_name(&title);
+    // `start` gives it its own console window, so he can see it running and close it.
+    let mut command = Command::new("cmd");
+    command
+        .args(["/c", "start", &format!("Remote Control - {name}")])
+        .arg(&claude)
+        .args(["remote-control", "--name", &name, "--permission-mode", "auto"])
+        .current_dir(&cwd)
+        .env_remove("CLAUDECODE")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW for cmd itself; `start` opens the real window
+    }
+    command.spawn().map_err(|e| format!("Could not start Remote Control: {e}"))?;
+    Ok(name)
+}
+
 /// True when this launch asked for the Hub (`pandacode.exe --hub`).
 pub(crate) fn wants_hub<I: IntoIterator<Item = S>, S: AsRef<str>>(args: I) -> bool {
     args.into_iter().any(|a| a.as_ref() == "--hub")
@@ -590,6 +630,9 @@ mod tests {
     #[test]
     fn wants_hub_only_with_the_flag() {
         assert!(wants_hub(["pandacode.exe", "--hub"]));
+        assert_eq!(remote_control_name("Chief of Staff · You"), "Chief of Staff");
+        assert_eq!(remote_control_name("Fix the scout"), "Fix the scout");
+        assert_eq!(remote_control_name(""), "Hub chat");
         assert!(!wants_hub(["pandacode.exe"]));
     }
 

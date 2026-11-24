@@ -4096,6 +4096,8 @@ pub fn run() {
                     hub::hub_running_now,
                     hub::hub_task_run_now,
                     hub::hub_task_set_enabled,
+                    // "/remote-control" in a Hub chat (Claude Code's own `claude remote-control`).
+                    hub::hub_remote_control,
                     // Chats panel: PandaCode's own chat commands, the same ones its main window uses.
                     list_sessions,
                     list_providers,

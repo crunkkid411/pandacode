@@ -119,12 +119,23 @@ test("chat box: the model menu lists the agent program's models and switches the
   await expect(page.getByRole('button', { name: 'Change model' })).toHaveText(/Sonnet 5\.5/);
 });
 
+test('chat box: /remote-control starts Claude Code Remote Control for this chat and says how to use it', async ({ page }) => {
+  await open(page, '/agents/b1');
+  const box = page.locator('textarea').first();
+  await box.fill('/remote-control');
+  await box.press('Escape');
+  await box.press('Enter');
+  await expect.poll(async () => (await calls(page, 'hub_remote_control')).length).toBe(1);
+  await expect(page.getByText(/Remote Control started in its own window as "Chief of Staff"/).first()).toBeVisible();
+  expect(await calls(page, 'bot_message')).toHaveLength(0); // not sent to the agent as a message
+});
+
 test('chat box: "/" lists Hub and agent commands; /agent opens another agent; window-only commands are refused', async ({ page }) => {
   await open(page, '/agents/b1');
   const box = page.locator('textarea').first();
   await box.fill('/');
   const list = page.getByRole('listbox', { name: 'Commands' });
-  for (const name of ['/agent', '/rename', '/review', '/video-rules']) await expect(list.getByText(new RegExp(`^${name}`))).toBeVisible();
+  for (const name of ['/agent', '/rename', '/remote-control', '/review', '/video-rules']) await expect(list.getByText(new RegExp(`^${name}`))).toBeVisible();
   await expect(list.getByText(/^\/permissions/)).toHaveCount(0); // a PandaCode window control
   await box.fill('/agent cl');
   await list.getByText('Clip Finder', { exact: true }).click();

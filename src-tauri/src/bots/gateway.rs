@@ -74,7 +74,9 @@ fn channel_kind(store: &Store, channel_id: &str) -> String {
 fn compose(app: &tauri::AppHandle, store: &Store, bot: &Bot, session_id: &str, kind: &str, sender: &str, text: &str) -> Result<String> {
     let (skills, skipped) = workspace_skills(app, store, bot, session_id);
     let seen = super::brief_version_of(store, session_id)?;
-    if seen == bot.memory_version && !handoff_pending(store, session_id)? {
+    // A slash command ("/compact", "/context") goes as typed: a brief on its end would become the
+    // command's arguments. The thread stays unbriefed, so the next plain message carries the brief.
+    if is_slash_command(text) || (seen == bot.memory_version && !handoff_pending(store, session_id)?) {
         return Ok(text.to_owned());
     }
     for error in &skipped {
@@ -84,6 +86,12 @@ fn compose(app: &tauri::AppHandle, store: &Store, bot: &Bot, session_id: &str, k
     super::mark_briefed(store, session_id, bot.memory_version)?;
     let team = super::org::team_text(store, bot)?;
     Ok(format!("{text}{}{team}{skills}", brief::compose(bot, &memories, kind, sender)))
+}
+
+/// "/name ..." typed as a command (not a path like "/c/Users" or a sentence starting with "/ ").
+pub(crate) fn is_slash_command(text: &str) -> bool {
+    let first = text.trim_start().split_whitespace().next().unwrap_or("");
+    first.len() > 1 && first.starts_with('/') && first[1..].chars().all(|c| c.is_alphanumeric() || "_-:.".contains(c))
 }
 
 /// A harness switch starts a fresh native session fed by a 64 KiB history replay
@@ -498,6 +506,16 @@ pub(crate) async fn stop_bot(app: &tauri::AppHandle, bot_id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slash_commands_are_told_apart_from_paths_and_sentences() {
+        for yes in ["/compact", "/context", "  /compact keep the plan", "/gsd:review", "/remote-control"] {
+            assert!(is_slash_command(yes), "{yes}");
+        }
+        for no in ["/", "/c/Users/only1", "hello /compact", "/ not a command", "C:/x", ""] {
+            assert!(!is_slash_command(no), "{no}");
+        }
+    }
 
     #[test]
     fn queued_attachments_reach_the_prompt() {

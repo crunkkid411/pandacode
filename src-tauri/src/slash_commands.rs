@@ -239,7 +239,7 @@ impl CommandCache {
             if let Some(names) = explicit_terminals {
                 terminal_names = names
                     .iter()
-                    .take(512)
+                    .take(2048)
                     .filter_map(Value::as_str)
                     .map(|name| format!("/{}", name.strip_prefix('/').unwrap_or(name)))
                     .filter(|name| valid_name(name))
@@ -455,7 +455,9 @@ fn normalize(catalog: &mut Catalog, provider: &str) {
         }
     }
     catalog.commands.retain(|command| valid_name(&command.name));
-    catalog.commands.truncate(1000);
+    // Same cap as claude.rs MAX_COMMANDS: Claude Code lists its own built-ins (/compact, /usage...)
+    // last, after every skill, and at 1,000 his 1,016-entry list lost them (2026-11-23).
+    catalog.commands.truncate(2048);
     for command in &mut catalog.commands {
         command.description = bounded(&command.description, 500);
         command.argument_hint = command

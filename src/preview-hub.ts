@@ -190,6 +190,7 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
     { kind: 'skill', name: 'video-rules', description: 'Video editing rules', places: ['X:/AI-2 project'], path: 'X:/AI-2/rules/SKILL.md', ours: true },
   ] as T;
   if (command === 'hub_speak') return new ArrayBuffer(0) as T;
+  if (command === 'hub_remote_control') return 'Chief of Staff' as T;
   if (command === 'hub_inbox_add' || command === 'hub_inbox_install' || command === 'hub_open_link') return null as T;
   // Inbox read state: everything counts as new in the preview until marked read.
   if (command === 'hub_inbox_seen' || command === 'hub_inbox_mark_read') {

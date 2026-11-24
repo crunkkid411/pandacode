@@ -11,6 +11,7 @@ export const HUB_COMMANDS: ChatCommand[] = [
   { name: '/agent', description: 'Switch to another agent', hint: '<name>', source: 'Hub' },
   { name: '/model', description: 'Switch this chat to another model', hint: '<model name>', source: 'Hub' },
   { name: '/rename', description: 'Rename this chat', hint: '<new name>', source: 'Hub' },
+  { name: '/remote-control', description: 'Use this agent from your phone or claude.ai (Claude Code Remote Control)', source: 'Hub' },
 ];
 /** PandaCode window controls that have no place in the Hub; the Hub's own versions above replace /model and /rename. */
 const WINDOW_ONLY = new Set(['/new', '/model', '/permissions', '/settings', '/theme', '/resume', '/rename', '/btw', '/copy', '/pwd', '/diff', '/console']);

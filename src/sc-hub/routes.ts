@@ -100,7 +100,8 @@ export function chatStream(call: Call, id: string, text: string, pollMs = 1500, 
         if (botId) await call('bot_message', { botId, text, imageIds, moodboardIds: [] });
         else {
           // A chat handed to an agent carries the agent's brief on its first message (and after the brief changes).
-          const brief = await call<string | null>('bot_task_brief', { sessionId: id }).catch(() => null) ?? '';
+          // Not on a slash command: the brief would become its arguments (gateway.rs is_slash_command).
+          const brief = slashParts(text) ? '' : await call<string | null>('bot_task_brief', { sessionId: id }).catch(() => null) ?? '';
           await call('send_message', { sessionId: id, text: text + brief, imageIds, moodboardIds: [] });
         }
         const started = Date.now();
@@ -138,6 +139,11 @@ function note(text: string, problem = false): Response {
 /** The Hub's own slash commands. Returns the answer to show, or null when it is not one of them. */
 async function hubSlash(call: Call, id: string, name: string, args: string): Promise<string | null> {
   if (name === '/agent') return 'Pick an agent from the list that opens when you type /agent.';
+  if (name === '/remote-control') {
+    const shown = await call<string>('hub_remote_control', { sessionId: id });
+    // Claude Code asks once per folder whether to trust it (no flag skips that check, by design).
+    return `Remote Control started in its own window as "${shown}". The first time for this agent, that window asks whether to trust the folder: type y and press Enter. Then open claude.ai/code or the Claude app to carry on from your phone. It starts a new conversation in this agent's folder. Close that window to stop it.`;
+  }
   if (name === '/rename') {
     if (!args) throw new Error('Type the new name after /rename.');
     await call('update_session', { sessionId: id, title: args });

@@ -9,7 +9,9 @@ use tokio::{
     time::Instant,
 };
 
-const MAX_COMMANDS: usize = 512;
+// Jordan's Claude Code reports 1,016 commands (2026-11-23) and its own built-ins (/compact,
+// /context, /usage...) come last, so 512 cut every one of them. Still capped, with room to grow.
+const MAX_COMMANDS: usize = 2048;
 const DISCOVERY_FAILED: &str =
     "Claude Code commands could not be loaded. Check the installed CLI and try again.";
 
@@ -202,7 +204,7 @@ pub(super) fn parse_entries(
     if limited {
         catalog
             .warnings
-            .push("The command list was limited to 512 entries.".into());
+            .push(format!("The command list was limited to {MAX_COMMANDS} entries."));
     }
     catalog
 }
@@ -521,9 +523,15 @@ mod tests {
             json!({"name":"/private/secret.md"}),
             json!({"name":"inject\nline"}),
         ];
-        entries.extend((0..600).map(|i| json!({"name":format!("command-{i}"),"description":"é".repeat(1200),"argumentHint":"x".repeat(200),"aliases":["shared-alias"]})));
+        entries.extend((0..2100).map(|i| json!({"name":format!("command-{i}"),"description":"é".repeat(1200),"argumentHint":"x".repeat(200),"aliases":["shared-alias"]})));
         let catalog = parse_entries(&entries, "claude", &HashSet::new());
-        assert_eq!(catalog.commands.len(), 511);
+        // The first 2,048 entries: 2 bad names dropped, 2,046 commands plus one shared alias.
+        assert_eq!(catalog.commands.len(), MAX_COMMANDS - 1);
+        // A list the size of Jordan's (1,016) keeps its last entries, where Claude's built-ins sit.
+        let his: Vec<Value> = (0..1016).map(|i| json!({"name":format!("c{i}")})).collect();
+        let mut kept = parse_entries(&his, "claude", &HashSet::new());
+        crate::slash_commands::normalize(&mut kept, "claude");
+        assert!(kept.commands.iter().any(|c| c.name == "/c1015"));
         assert_eq!(catalog.commands[0].description.chars().count(), 600);
         assert_eq!(
             catalog.commands[0].argument_hint.as_ref().unwrap().len(),
