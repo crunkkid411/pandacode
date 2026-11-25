@@ -887,10 +887,32 @@ fn create_agent_tool_makes_an_auto_claude_agent_in_its_work_folder_and_refuses_a
     let made = super::tools::create_agent(&f.store, &args, &f.root).unwrap();
     let bot = get(&f.store, made["id"].as_str().unwrap()).unwrap();
     assert_eq!((bot.provider.as_str(), bot.model.as_str(), bot.mode.as_str()), ("claude", "default", "review"));
-    assert_eq!(f.store.project(&bot.work_project).unwrap().path, work.canonicalize().unwrap().to_string_lossy());
+    // The folder is the agent's own (root\video-editor), so it is its one workspace, not a second folder.
+    assert_eq!(bot.work_project, "");
+    assert_eq!(f.store.project(&bot.project_id).unwrap().path, work.canonicalize().unwrap().to_string_lossy());
+    let elsewhere = f.root.join("footage");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    let other = super::tools::create_agent(&f.store, &json!({"name": "Clipper", "instructions": "x", "workFolder": elsewhere.to_string_lossy()}), &f.root).unwrap();
+    let other = get(&f.store, other["id"].as_str().unwrap()).unwrap();
+    assert_eq!(f.store.project(&other.work_project).unwrap().path, elsewhere.canonicalize().unwrap().to_string_lossy());
     let again = super::tools::create_agent(&f.store, &json!({"name": "video editor", "instructions": "x"}), &f.root);
     assert!(again.unwrap_err().contains("already exists"));
     let missing = super::tools::create_agent(&f.store, &json!({"name": "Other", "instructions": "x", "workFolder": f.root.join("nope").to_string_lossy()}), &f.root);
     assert!(missing.unwrap_err().contains("does not exist"));
     assert!(super::tools::self_scoped("pandacode_bot_create_agent"));
+}
+
+#[test]
+fn bot_folder_is_the_plain_name_reuses_a_premade_folder_and_adds_id_when_taken() {
+    let f = fixture();
+    // A folder made beforehand (the new-agent skill writes the brief there first) is used as is.
+    std::fs::create_dir_all(f.root.join("video-editor")).unwrap();
+    std::fs::write(f.root.join("video-editor").join("jordan-brief.md"), "brief").unwrap();
+    let first = create(&f.store, &input("Video Editor"), &f.root).unwrap();
+    let path: String = f.store.db.query_row("SELECT path FROM projects WHERE id=?1", [&first.project_id], |r| r.get(0)).unwrap();
+    assert!(path.ends_with("video-editor"), "{path}");
+    // That folder now belongs to a project, so another agent with the same folder name gets the id added.
+    let second = bot_folder(&f.root, "Video Editor", "1605e86b-7891", |p| is_project_folder(&f.store, p));
+    assert_eq!(second, f.root.join("video-editor-1605e86b"));
+    assert_eq!(bot_folder(&f.root, "!!", "abcdef12-0000", |_| false), f.root.join("bot"));
 }

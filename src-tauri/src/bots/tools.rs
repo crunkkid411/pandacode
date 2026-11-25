@@ -47,7 +47,10 @@ pub(super) fn create_agent(store: &crate::storage::Store, args: &Value, root: &s
         return Err(format!("The folder {folder} does not exist. Create it first, or leave workFolder empty."));
     }
     let bot = super::create(store, &input, root)?;
-    let bot = if folder.is_empty() { bot } else {
+    let own = store.project(&bot.project_id).map(|p| p.path).unwrap_or_default();
+    let same = std::path::Path::new(&folder).canonicalize().map(|p| p.to_string_lossy() == own).unwrap_or(false);
+    // A workFolder that is the agent's own hj-agents folder is its one workspace, not a second folder.
+    let bot = if folder.is_empty() || same { bot } else {
         let project = store.add_project(std::path::Path::new(&folder))?;
         super::work_project::set(store, &bot.id, Some(&project.id))?
     };

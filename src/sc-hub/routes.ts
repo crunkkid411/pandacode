@@ -15,8 +15,8 @@ import { HARNESSES, mascotKind, mascotSeed } from './mascots';
 import { forSend, spoken, uploadPicture } from './attachments';
 import { chatCommands, forwardMentions, slashParts } from './chat-commands';
 
-/** Bot workspaces live in "PandaCode Bots" (bots.rs); a deleted bot's folder stays listed, so the path is matched too. */
-const BOT_FOLDER = /[\\/]PandaCode Bots[\\/]/i;
+/** Bot workspaces live in X:\AI-2\hj-agents, or "PandaCode Bots" on other machines (bots.rs); a deleted bot's folder stays listed, so the path is matched too. */
+const BOT_FOLDER = /[\\/](PandaCode Bots|hj-agents)[\\/]/i;
 
 /** PandaCode projects an agent can work in (bots' own workspaces left out). */
 async function projects(call: Call) {

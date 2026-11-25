@@ -551,14 +551,30 @@ pub(crate) fn task_links(store: &Store) -> Result<std::collections::HashMap<Stri
     rows.collect::<rusqlite::Result<_>>().map_err(|e| e.to_string())
 }
 
-/// Folder name for a bot workspace: readable, unique per bot.
-fn slug(name: &str, id: &str) -> String {
+/// Folder for a bot workspace: its readable name ("video-editor"), with the id added only when that
+/// folder already belongs to a project. A folder made beforehand for this agent (the new-agent
+/// skill writes its brief there first) is used as is.
+fn bot_folder(root: &std::path::Path, name: &str, id: &str, taken: impl Fn(&std::path::Path) -> bool) -> PathBuf {
     let base: String = name.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
     let base = base.split('-').filter(|part| !part.is_empty()).collect::<Vec<_>>().join("-");
-    format!("{}-{}", if base.is_empty() { "bot".into() } else { base }, &id[..8])
+    let base = if base.is_empty() { "bot".to_string() } else { base };
+    let plain = root.join(&base);
+    if taken(&plain) { root.join(format!("{base}-{}", &id[..8])) } else { plain }
 }
 
+/// True when `folder` exists and is already a registered project (another bot's or a code project).
+fn is_project_folder(store: &Store, folder: &std::path::Path) -> bool {
+    let Ok(path) = folder.canonicalize() else { return false };
+    store.db.query_row("SELECT 1 FROM projects WHERE path=?1", [path.to_string_lossy()], |_| Ok(())).optional().ok().flatten().is_some()
+}
+
+/// Jordan's agents folder (Jordan, 2026-11-24: "all agents should have a single file inside the
+/// hj-agents folder. That is their workspace"). Other machines fall back to ~/PandaCode Bots.
+pub(crate) const AGENTS_HOME: &str = r"X:\AI-2\hj-agents";
+
 pub(crate) fn workspace_root() -> PathBuf {
+    let agents = PathBuf::from(AGENTS_HOME);
+    if agents.is_dir() { return agents; }
     crate::agent_usage_providers::home().unwrap_or_else(std::env::temp_dir).join("PandaCode Bots")
 }
 
@@ -581,7 +597,7 @@ pub(crate) fn list(store: &Store) -> Result<Vec<Bot>> {
 pub(crate) fn create(store: &Store, input: &BotInput, root: &std::path::Path) -> Result<Bot> {
     let input = validate(input)?;
     let id = crate::storage::id();
-    let folder = root.join(slug(&input.name, &id));
+    let folder = bot_folder(root, &input.name, &id, |p| is_project_folder(store, p));
     std::fs::create_dir_all(&folder).map_err(|e| format!("Could not create the bot's workspace: {e}"))?;
     let project = store.add_project(&folder)?;
     // The sidebar shows the bot's name, not its folder's.
