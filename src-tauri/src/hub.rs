@@ -69,6 +69,8 @@ pub struct RunningNow {
     pub memory: Memory,
     pub gpu: Option<Gpu>,
     pub processes: Vec<Proc>,
+    /// Every AI program, model server, runtime and terminal, one card per family (hub_programs.rs).
+    pub programs: Vec<crate::hub_programs::Program>,
     pub tasks: Vec<Task>,
     /// Set when the task list could not be read, so the panel can say so instead of
     /// showing an empty list as if there were no tasks (a GUI must never lie).
@@ -186,22 +188,56 @@ fn classify_process(name: &str) -> Option<&'static str> {
     }
 }
 
-fn memory_and_processes(cache: &mut Cache) -> (Memory, Vec<Proc>) {
+/// Every process on the PC, for the Running-now cards.
+fn raw_processes(system: &sysinfo::System) -> Vec<crate::hub_programs::RawProc> {
+    system
+        .processes()
+        .values()
+        .map(|p| crate::hub_programs::RawProc {
+            pid: p.pid().as_u32(),
+            parent: p.parent().map(|x| x.as_u32()),
+            name: p.name().to_string_lossy().into_owned(),
+            cmd: p.cmd().iter().map(|a| a.to_string_lossy().into_owned()).collect(),
+            cwd: p.cwd().map(|c| c.display().to_string()).unwrap_or_default(),
+            started_ms: p.start_time() * 1000,
+            mem_mb: p.memory() / 1_048_576,
+        })
+        .collect()
+}
+
+fn refresh_system(cache: &mut Cache) -> Option<&mut sysinfo::System> {
     use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
     if cache.system.is_none() {
         cache.system = System::new_with_specifics(sysinfo::RefreshKind::nothing()).ok();
     }
-    let Some(system) = cache.system.as_mut() else {
-        return (Memory { total_mb: 0, free_mb: 0 }, Vec::new());
-    };
+    let system = cache.system.as_mut()?;
     system.refresh_memory();
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
         true,
         ProcessRefreshKind::nothing()
             .with_memory()
-            .with_cmd(UpdateKind::OnlyIfNotSet),
+            .with_cmd(UpdateKind::OnlyIfNotSet)
+            .with_cwd(UpdateKind::OnlyIfNotSet),
     );
+    Some(system)
+}
+
+/// Stops one Running-now card and everything it started.
+pub(crate) fn stop_program(pid: u32, started_ms: u64) -> Result<(), String> {
+    let procs = {
+        let mut cache = CACHE.lock().map_err(|e| e.to_string())?;
+        let system = refresh_system(&mut cache).ok_or("Could not read this PC's programs.")?;
+        raw_processes(system)
+    };
+    crate::hub_programs::stop(pid, started_ms, &procs, std::process::id())
+}
+
+fn memory_and_processes(cache: &mut Cache) -> (Memory, Vec<Proc>, Vec<crate::hub_programs::Program>) {
+    let Some(system) = refresh_system(cache) else {
+        return (Memory { total_mb: 0, free_mb: 0 }, Vec::new(), Vec::new());
+    };
+    let programs = crate::hub_programs::group(&raw_processes(system), std::process::id());
     let memory = Memory {
         total_mb: system.total_memory() / 1_048_576,
         free_mb: system.available_memory() / 1_048_576,
@@ -230,7 +266,7 @@ fn memory_and_processes(cache: &mut Cache) -> (Memory, Vec<Proc>) {
         })
         .collect();
     processes.sort_by(|a, b| b.mem_mb.cmp(&a.mem_mb).then(a.pid.cmp(&b.pid)));
-    (memory, processes)
+    (memory, processes, programs)
 }
 
 // ---------- scheduled tasks ----------
@@ -398,7 +434,7 @@ pub(crate) fn running_now(force_tasks: bool) -> Result<RunningNow, String> {
     // The graphics card is asked outside the lock: it can take up to GPU_TIMEOUT.
     let gpu = gpu_facts_from("nvidia-smi");
     let mut cache = CACHE.lock().map_err(|e| e.to_string())?;
-    let (memory, processes) = memory_and_processes(&mut cache);
+    let (memory, processes, programs) = memory_and_processes(&mut cache);
     let (tasks, tasks_error) = match tasks_cached(&mut cache, force_tasks) {
         Ok(tasks) => (tasks, None),
         Err(error) => (Vec::new(), Some(error)),
@@ -407,6 +443,7 @@ pub(crate) fn running_now(force_tasks: bool) -> Result<RunningNow, String> {
         memory,
         gpu,
         processes,
+        programs,
         tasks,
         tasks_error,
         read_at_ms: now_ms(),
@@ -418,6 +455,13 @@ pub(crate) fn running_now(force_tasks: bool) -> Result<RunningNow, String> {
 #[tauri::command]
 pub async fn hub_running_now() -> Result<RunningNow, String> {
     tauri::async_runtime::spawn_blocking(|| running_now(false))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn hub_stop_program(pid: u32, started_ms: u64) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || stop_program(pid, started_ms))
         .await
         .map_err(|e| e.to_string())?
 }

@@ -5,7 +5,13 @@ export interface Memory { totalMb: number; freeMb: number }
 export interface Gpu { name: string; totalMb: number; freeMb: number; tempC: number; utilPct: number }
 export interface Proc { pid: number; name: string; commandLine: string; startedMs: number; memMb: number; kind: 'llm-server' | 'agent' | 'helper'; label: string }
 export interface Task { path: string; name: string; enabled: boolean; state: string; lastRun: string; lastResult: number; nextRun: string; action: string; mine: boolean }
-export interface RunningNowFacts { memory: Memory; gpu: Gpu | null; processes: Proc[]; tasks: Task[]; tasksError: string | null; readAtMs: number }
+/** One card on the Running-now page: a program and every helper it started (hub_programs.rs). */
+export interface Program {
+  pid: number; startedMs: number; kind: 'model' | 'agent' | 'job' | 'runtime' | 'terminal';
+  title: string; detail: string; inside: string[]; memMb: number; count: number;
+  leftover: boolean; onGpu: boolean; selfStopping: boolean; isHub: boolean; commandLine: string;
+}
+export interface RunningNowFacts { memory: Memory; gpu: Gpu | null; processes: Proc[]; programs: Program[]; tasks: Task[]; tasksError: string | null; readAtMs: number }
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'off';
 

@@ -4,6 +4,7 @@ mod agent_tools;
 mod agents_dock;
 mod hub;
 mod hub_org;
+mod hub_programs;
 mod hub_skills;
 mod hub_templates;
 mod hub_inbox;
@@ -4094,6 +4095,7 @@ pub fn run() {
             if invoke.message.webview_ref().label() == hub::LABEL {
                 let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
                     hub::hub_running_now,
+                    hub::hub_stop_program,
                     hub::hub_task_run_now,
                     hub::hub_task_set_enabled,
                     // "/remote-control" in a Hub chat (Claude Code's own `claude remote-control`).

@@ -458,22 +458,26 @@ test('look: rail, side panel and page are different grays (no purple tint); text
   await expect.poll(() => claude.evaluate(e => e.innerHTML)).toContain('crispEdges'); // Clawd
 });
 
-test('sessions: every live chat with its state as color and word; Ctrl+click picks two; Stop stops the working one; Open opens each', async ({ page }) => {
+test('running now: every AI program on the PC by group; leftover model flagged; Ctrl+click picks two; Stop asks once more, then stops both', async ({ page }) => {
   await open(page, '/runs');
-  await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible();
-  const list = page.getByRole('list', { name: 'Sessions' });
-  await expect(list.getByRole('button')).toHaveCount(3); // two chats + the agent's own thread; the archived chat is left out
-  await expect(list.getByRole('button').first()).toContainText('Working'); // working before done
-  await list.getByRole('button', { name: /Write the shorts captions/ }).click();
-  await list.getByRole('button', { name: /Fix the playlist scout/ }).click({ modifiers: ['Control'] });
+  await expect(page.getByRole('heading', { name: 'Running now' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('1 AI model is left over');
+  const models = page.getByRole('list', { name: 'AI models' });
+  await expect(models.getByRole('button')).toHaveCount(2);
+  await expect(models.getByRole('button').first()).toContainText('Fara1.5-4B-Q4_K_M');
+  await expect(models.getByRole('button').first()).toContainText('Leftover');
+  await expect(page.getByRole('list', { name: 'Terminals' }).getByRole('button')).toContainText('Running Claude Code');
+  await expect(page.getByRole('list', { name: 'Agents and AI apps' }).getByRole('button', { name: /^Hub/ })).toBeDisabled(); // the Hub can't stop itself
+  await models.getByRole('button').first().click();
+  await page.getByRole('list', { name: 'Scripts and helpers' }).getByRole('button').click({ modifiers: ['Control'] });
   await expect(page.getByText('2 picked')).toBeVisible();
-  await page.getByRole('button', { name: 'Stop', exact: true }).click();
-  await expect.poll(async () => (await calls(page, 'stop_session')).map(c => c.args.sessionId)).toEqual(['c2']);
-  await page.getByRole('button', { name: /Open in PandaCode \(2\)/ }).click();
-  await expect.poll(async () => (await calls(page, 'overlay_open_task')).map(c => c.args.sessionId).sort()).toEqual(['c1', 'c2']);
-  await page.getByRole('button', { name: /^Failed 1$/ }).click();
-  await expect(list.getByRole('button')).toHaveCount(1);
-  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-sessions.png`, fullPage: true });
+  await page.getByRole('button', { name: /Stop \(2\)/ }).click();
+  expect(await calls(page, 'hub_stop_program')).toHaveLength(0); // first click only asks
+  await page.getByRole('button', { name: 'Click again to stop 2' }).click();
+  await expect.poll(async () => (await calls(page, 'hub_stop_program')).map(c => c.args.pid).sort()).toEqual([3100, 7896]);
+  await expect(models.getByRole('button')).toHaveCount(1);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.screenshot({ path: `${process.env.HUB_SHOT_DIR ?? 'test-results'}/sc-running-now.png`, fullPage: true });
 });
 
 test('projects: his project folders, then each agent\'s own folder by name; Add a project folder adds one', async ({ page }) => {

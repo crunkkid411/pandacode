@@ -1,9 +1,24 @@
 // Browser preview of the Hub's backend (src-tauri/src/hub.rs), for page tests only.
 // Every call is recorded in `window.__hubCalls`; `window.__hubNoGpu = true` makes the
 // graphics card "not answer", like a crashed driver.
-import type { RunningNowFacts, Task } from './hub/facts';
+import type { Program, RunningNowFacts, Task } from './hub/facts';
 import type { Chat, ChatMessage } from './hub/chats-facts';
 import type { HubBot, HubSchedule } from './hub/agents-facts';
+
+const PREVIEW_T0 = Date.now();
+// Running-now cards as hub_programs.rs groups them: a leftover model, a becky-bg job, agents, a terminal.
+const card = (pid: number, kind: Program['kind'], title: string, detail: string, memMb: number, more: Partial<Program> = {}): Program =>
+  ({ pid, startedMs: PREVIEW_T0 - pid * 1000, kind, title, detail, inside: [], memMb, count: 1, leftover: false, onGpu: false, selfStopping: false, isHub: false, commandLine: `${title} ${detail}`, ...more });
+const programs: Program[] = [
+  card(7896, 'model', 'AI model server', 'Fara1.5-4B-Q4_K_M', 6763, { leftover: true, onGpu: true }),
+  card(46624, 'model', 'Skill picker model', 'd1-2B-Q4_K_M', 1187, { selfStopping: true, count: 2 }),
+  card(1600, 'agent', 'Claude Code', 'X:\\AI-2', 2900, { count: 45 }),
+  card(3000, 'agent', 'Hub', 'C:\\Users\\you\\AppData\\Local\\PandaCodeHub', 1200, { isHub: true, count: 11 }),
+  card(24940, 'job', 'Playlist Scout', 'powershell.exe', 11, { selfStopping: true }),
+  card(3100, 'runtime', 'open_review.pyw', 'X:\\AI-2', 646, { count: 8 }),
+  card(1476, 'terminal', 'Windows Terminal', 'C:\\WINDOWS\\system32', 214, { inside: ['Claude Code'], count: 4 }),
+];
+const stoppedPids = new Set<number>();
 
 const tasks: Task[] = [
   { path: '\\Becky Playlist Scout (idle)', name: 'Becky Playlist Scout (idle)', enabled: true, state: 'Ready', lastRun: '11/22/2026 3:10:00 AM', lastResult: 0, nextRun: '11/22/2026 7:10:00 AM', action: 'wscript run-hidden.vbs', mine: true },
@@ -319,12 +334,19 @@ export function invokeHub<T>(command: string, args: Record<string, any>): T {
         { pid: 4120, name: 'llama-server.exe', commandLine: 'llama-server -m d1-2B.gguf --port 8092', startedMs: Date.now() - 28 * 60_000, memMb: 512, kind: 'llm-server', label: 'llama-server' },
         { pid: 7311, name: 'claude.exe', commandLine: 'claude', startedMs: Date.now() - 90 * 60_000, memMb: 420, kind: 'agent', label: 'claude' },
       ],
+      programs: programs.filter(p => !stoppedPids.has(p.pid)),
       // His tasks first, then by name, like hub.rs parse_schtasks_csv.
       tasks: tasks.map(t => ({ ...t })).sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
       tasksError: null,
       readAtMs: Date.now(),
     };
     return facts as T;
+  }
+  if (command === 'hub_stop_program') {
+    const card = programs.find(p => p.pid === args.pid && p.startedMs === args.startedMs && !stoppedPids.has(p.pid));
+    if (!card) throw new Error('That program has already ended.');
+    stoppedPids.add(card.pid);
+    return undefined as T;
   }
   const task = tasks.find(t => t.path === args.path);
   if (!task) throw new Error(`No task ${args.path}`);

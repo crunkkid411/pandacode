@@ -1,4 +1,5 @@
-// The Hub's Sessions page (SwarmClaw's "Runs") and Projects page, in SwarmClaw's list + detail layout.
+// The Hub's Projects page, in SwarmClaw's list + detail layout. (Its Sessions page, a list of past
+// chats, was replaced by Running now on 2026-11-24: src/sc-hub/running-page.tsx.)
 // Facts: sessions-facts.ts. Every row: the agent's face, the chat title, its project, its harness logo,
 // and its state as a color AND a word. Click = pick one; Ctrl+click adds or removes one; Shift+click
 // picks a range; "Open in PandaCode" and "Stop" work on the whole selection.
@@ -102,38 +103,6 @@ function SessionList({ rows, onFacts, empty }: { rows: SessionRow[]; onFacts: (f
           })}
         </ul>
       ) : <p className="px-4 py-10 text-[15px] text-text-2 text-center">{empty}</p>}
-    </div>
-  );
-}
-
-const FILTERS: (SessionState | 'all')[] = ['all', 'needs-you', 'working', 'failed', 'idle'];
-
-export function HubSessions() {
-  const { facts, setFacts, failed } = useFacts();
-  const [filter, setFilter] = useState<SessionState | 'all'>('all');
-  if (failed && !facts) return <p className="px-8 py-8 text-[15px] text-red-400">Could not read your sessions: {failed}</p>;
-  if (!facts) return null;
-  const rows = facts.rows.filter(r => filter === 'all' || r.state === filter);
-  return (
-    <div className="h-full w-full flex-1 flex flex-col px-6 py-6 gap-5 overflow-hidden">
-      <div>
-        <h1 className="font-display text-[30px] font-700 tracking-[-0.02em] text-text">Sessions</h1>
-        <p className="text-[14px] text-text-2 mt-1">Every chat your agents are running in PandaCode, across all harnesses.</p>
-      </div>
-      <div className="flex gap-2 flex-wrap" role="group" aria-label="Show">
-        {FILTERS.map(f => {
-          const n = f === 'all' ? facts.rows.length : facts.rows.filter(r => r.state === f).length;
-          const color = f === 'all' ? '#ffffff' : SESSION_LOOK[f].color;
-          return (
-            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
-              className="px-3.5 py-2 rounded-full text-[14px] font-700 cursor-pointer"
-              style={{ fontFamily: 'inherit', color, border: `1.5px solid ${filter === f ? color : 'rgba(255,255,255,0.12)'}`, background: filter === f ? `color-mix(in srgb, ${color} 16%, #1d1d1d)` : '#1d1d1d' }}>
-              {f === 'all' ? 'All' : SESSION_LOOK[f].word} {n}
-            </button>
-          );
-        })}
-      </div>
-      <SessionList rows={rows} onFacts={setFacts} empty="No sessions here." />
     </div>
   );
 }

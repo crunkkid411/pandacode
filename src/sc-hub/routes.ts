@@ -614,7 +614,16 @@ export const routes: Route[] = [
     return call('hub_knowledge_search', { query: b.query ?? '', collection: b.collection || null });
   } },
   { method: 'POST', path: /^\/hub-knowledge\/get$/, run: ({ call, body }) => call('hub_knowledge_get', { file: ((body ?? {}) as { file?: string }).file ?? '' }) },
-  // Sessions and Projects (sessions-facts.ts). Stop works on the whole selection.
+  // Running now (where Sessions was): every AI program, model server and terminal on the PC (hub_programs.rs).
+  { method: 'GET', path: /^\/hub-running$/, run: ({ call }) => call('hub_running_now') },
+  { method: 'POST', path: /^\/hub-running\/stop$/, run: async ({ call, body }) => {
+    const failed: string[] = [];
+    for (const t of ((body ?? {}) as { targets?: { pid: number; startedMs: number; title: string }[] }).targets ?? []) {
+      await call('hub_stop_program', { pid: t.pid, startedMs: t.startedMs }).catch(e => failed.push(`${t.title}: ${e instanceof Error ? e.message : String(e)}`));
+    }
+    return { failed, facts: await call('hub_running_now') };
+  } },
+  // Projects (sessions-facts.ts). Stop works on the whole selection.
   { method: 'GET', path: /^\/hub-sessions$/, run: ({ call }) => hubSessions(call) },
   { method: 'GET', path: /^\/agents\/([^/]+)\/folder$/, run: async ({ call, match }) => {
     const [bots, list] = await Promise.all([listBots(call), call<PcProject[]>('list_projects')]);
