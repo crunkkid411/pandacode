@@ -929,3 +929,30 @@ fn heartbeat_runs_the_agents_own_heartbeat_file() {
     std::fs::write(&path, "  \n").unwrap();
     assert_eq!(heartbeat_prompt(&f.store, &bot), schedule::HEARTBEAT_PROMPT, "an empty box falls back");
 }
+
+#[test]
+fn instructions_and_personality_live_in_the_agents_folder() {
+    let f = fixture();
+    let made = bot(&f);
+    let dir = f.store.workspace_root(&made.project_id, None).unwrap();
+    // Created: both files exist in the folder.
+    assert!(dir.join("instructions.md").is_file() && dir.join("personality.md").is_file());
+    // Edited by hand outside the Hub: the Hub picks it up and re-briefs open threads.
+    std::fs::write(dir.join("instructions.md"), "Do the obvious thing.\n").unwrap();
+    std::fs::write(dir.join("personality.md"), "Blunt.\n").unwrap();
+    let read = get(&f.store, &made.id).unwrap();
+    assert_eq!((read.instructions.as_str(), read.soul.as_str()), ("Do the obvious thing.", "Blunt."));
+    assert!(read.memory_version > made.memory_version);
+    // Unchanged files do not bump the version again.
+    assert_eq!(get(&f.store, &made.id).unwrap().memory_version, read.memory_version);
+    // Edited in the Hub: the files follow.
+    let mut changed = input("Scout");
+    changed.instructions = "Be brief.".into();
+    changed.soul = "Blunt.".into();
+    update(&f.store, &made.id, &changed).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.join("instructions.md")).unwrap(), "Be brief.\n");
+    // A deleted file is written back from the database.
+    std::fs::remove_file(dir.join("personality.md")).unwrap();
+    assert_eq!(get(&f.store, &made.id).unwrap().soul, "Blunt.");
+    assert_eq!(std::fs::read_to_string(dir.join("personality.md")).unwrap(), "Blunt.\n");
+}

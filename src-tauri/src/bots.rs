@@ -579,18 +579,63 @@ pub(crate) fn workspace_root() -> PathBuf {
 }
 
 pub(crate) fn get(store: &Store, id: &str) -> Result<Bot> {
-    store
+    let bot = store
         .db
         .query_row(&format!("SELECT {BOT_COLUMNS} FROM bots WHERE id=?1"), [id], bot_row)
         .optional()
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| "This bot no longer exists.".into())
+        .ok_or_else(|| "This bot no longer exists.".to_owned())?;
+    sync_from_folder(store, bot)
 }
 
 pub(crate) fn list(store: &Store) -> Result<Vec<Bot>> {
-    let mut statement = store.db.prepare(&format!("SELECT {BOT_COLUMNS} FROM bots ORDER BY created_at")).map_err(|e| e.to_string())?;
-    let rows = statement.query_map([], bot_row).map_err(|e| e.to_string())?;
-    rows.collect::<rusqlite::Result<_>>().map_err(|e| e.to_string())
+    let bots: Vec<Bot> = {
+        let mut statement = store.db.prepare(&format!("SELECT {BOT_COLUMNS} FROM bots ORDER BY created_at")).map_err(|e| e.to_string())?;
+        let rows = statement.query_map([], bot_row).map_err(|e| e.to_string())?;
+        rows.collect::<rusqlite::Result<_>>().map_err(|e| e.to_string())?
+    };
+    bots.into_iter().map(|bot| sync_from_folder(store, bot)).collect()
+}
+
+/// Jordan, 2026-11-25: "everything about the agent needs to exist there ... so that i can view and
+/// edit the stuff with markdown whether or not we use The Hub". The agent's folder files win over
+/// the database: instructions.md = Instructions, personality.md = Personality. A missing file is
+/// written from the database once, so every agent has both.
+const INSTRUCTIONS_FILE: &str = "instructions.md";
+const PERSONALITY_FILE: &str = "personality.md";
+
+fn sync_from_folder(store: &Store, mut bot: Bot) -> Result<Bot> {
+    let Ok(dir) = store.workspace_root(&bot.project_id, None) else { return Ok(bot) };
+    let read = |file: &str, limit: usize| std::fs::read_to_string(dir.join(file)).ok().map(|text| clean(&text, limit));
+    let instructions = read(INSTRUCTIONS_FILE, MAX_TEXT);
+    let soul = read(PERSONALITY_FILE, MAX_SOUL);
+    if instructions.is_none() || soul.is_none() {
+        write_folder(&dir, &bot.instructions, &bot.soul, instructions.is_none(), soul.is_none());
+    }
+    let instructions = instructions.unwrap_or_else(|| bot.instructions.clone());
+    let soul = soul.unwrap_or_else(|| bot.soul.clone());
+    if instructions != bot.instructions || soul != bot.soul {
+        // Edited outside the Hub: store it and bump the version so open threads get the new brief.
+        store
+            .db
+            .execute("UPDATE bots SET instructions=?2,soul=?3,memory_version=memory_version+1 WHERE id=?1", params![bot.id, instructions, soul])
+            .map_err(|e| e.to_string())?;
+        bot.instructions = instructions;
+        bot.soul = soul;
+        bot.memory_version += 1;
+    }
+    Ok(bot)
+}
+
+// ponytail: a write error only logs; the database still holds the text and the next read retries.
+fn write_folder(dir: &std::path::Path, instructions: &str, soul: &str, instructions_too: bool, soul_too: bool) {
+    for (wanted, file, text) in [(instructions_too, INSTRUCTIONS_FILE, instructions), (soul_too, PERSONALITY_FILE, soul)] {
+        if wanted && dir.is_dir() {
+            if let Err(error) = std::fs::write(dir.join(file), format!("{}\n", text.trim_end())) {
+                eprintln!("Could not write {file}: {error}");
+            }
+        }
+    }
 }
 
 /// Creates a bot with its own workspace folder, registered as a project.
@@ -610,6 +655,7 @@ pub(crate) fn create(store: &Store, input: &BotInput, root: &std::path::Path) ->
             params![id, input.name, input.role, input.instructions, input.goals, input.avatar, project.id, input.provider, input.model, input.mode, input.heartbeat_minutes, schedule::heartbeat_after(input.heartbeat_minutes, now), now, input.color, input.reasoning_effort, json!(input.backup_models).to_string(), input.fallback_mode, input.notify, input.while_working, input.show_plan, input.soul],
         )
         .map_err(|e| e.to_string())?;
+    write_folder(&folder, &input.instructions, &input.soul, true, true);
     log(store, &id, "created", &format!("Created {}", input.name), json!({}))?;
     org::rebrief_coordinators(store)?;
     get(store, &id)
@@ -629,6 +675,9 @@ pub(crate) fn update(store: &Store, id: &str, input: &BotInput) -> Result<Bot> {
             params![id, input.name, input.role, input.instructions, input.goals, input.avatar, input.provider, input.model, input.mode, input.heartbeat_minutes, next, brief_changed as i64, now, input.color, input.reasoning_effort, json!(input.backup_models).to_string(), input.fallback_mode, input.notify, input.while_working, input.show_plan, input.soul],
         )
         .map_err(|e| e.to_string())?;
+    if let Ok(dir) = store.workspace_root(&before.project_id, None) {
+        write_folder(&dir, &input.instructions, &input.soul, true, true);
+    }
     if before.name != input.name || before.role != input.role {
         org::rebrief_coordinators(store)?;
     }
