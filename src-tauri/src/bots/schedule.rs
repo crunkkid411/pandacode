@@ -239,7 +239,11 @@ pub(crate) fn start(app: tauri::AppHandle) {
                 }
             }
             for bot in due.1 {
-                let _ = gateway::run_scheduled(&app, &bot.id, "Check-in", HEARTBEAT_PROMPT).await;
+                // Its own heartbeat.md (bots.rs heartbeat_prompt), the file the Hub's heartbeat box edits.
+                let prompt = app.state::<AppState>().store.lock().map(|store| super::heartbeat_prompt(&store, &bot)).unwrap_or_else(|_| HEARTBEAT_PROMPT.to_owned());
+                if let Err(error) = gateway::run_scheduled(&app, &bot.id, "Heartbeat", &prompt).await {
+                    super::note(&app, &bot.id, "error", &format!("Heartbeat could not start: {error}"), json!({}));
+                }
             }
             let _ = app.emit("bots-changed", ());
         }

@@ -982,6 +982,41 @@ pub async fn bot_set_paused(app: tauri::AppHandle, window: tauri::WebviewWindow,
     Ok(bot)
 }
 
+/// What the agent does on each heartbeat: heartbeat.md in its own workspace folder (Jordan,
+/// 2026-11-25: "each agent's folder is their workspace"). The Hub's heartbeat box edits this file.
+pub(crate) fn heartbeat_file(store: &Store, bot: &Bot) -> Result<PathBuf> {
+    Ok(store.workspace_root(&bot.project_id, None)?.join("heartbeat.md"))
+}
+
+/// The agent's heartbeat instructions, or the built-in check-in when its folder has none.
+pub(crate) fn heartbeat_prompt(store: &Store, bot: &Bot) -> String {
+    heartbeat_file(store, bot)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty())
+        .unwrap_or_else(|| schedule::HEARTBEAT_PROMPT.to_owned())
+}
+
+#[tauri::command]
+pub async fn bot_heartbeat_get(state: State<'_, AppState>, bot_id: String) -> Result<String> {
+    let store = state.store.lock().map_err(|e| e.to_string())?;
+    let path = heartbeat_file(&store, &get(&store, &bot_id)?)?;
+    match std::fs::read_to_string(&path) {
+        Ok(text) => Ok(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("Could not read {}: {e}", path.display())),
+    }
+}
+
+#[tauri::command]
+pub async fn bot_heartbeat_set(window: tauri::WebviewWindow, state: State<'_, AppState>, bot_id: String, text: String) -> Result<()> {
+    guard_main(&window)?;
+    let store = state.store.lock().map_err(|e| e.to_string())?;
+    let path = heartbeat_file(&store, &get(&store, &bot_id)?)?;
+    std::fs::write(&path, text.trim_end().to_owned() + "\n").map_err(|e| format!("Could not save {}: {e}", path.display()))
+}
+
 #[tauri::command]
 pub async fn bot_reset(app: tauri::AppHandle, window: tauri::WebviewWindow, state: State<'_, AppState>, bot_id: String) -> Result<Bot> {
     guard_main(&window)?;

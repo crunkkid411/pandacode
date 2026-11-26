@@ -50,7 +50,10 @@ const NAMES: Record<string, string> = { opencode: 'OpenCode', hermes: 'Hermes Ag
 export async function botAgents(call: Call): Promise<Record<string, Agent>> {
   const pinned = new Set(saved().pinned);
   await loadLibrary(call); // so each agent's skills show as picked
-  return Object.fromEntries((await listBots(call)).map(b => [b.id, { ...botAgent(b), pinned: pinned.has(b.id) }]));
+  const bots = await listBots(call);
+  // What each agent does on a heartbeat: heartbeat.md in its own folder (bots.rs heartbeat_file).
+  const beats = await Promise.all(bots.map(b => call<string>('bot_heartbeat_get', { botId: b.id }).catch(() => '')));
+  return Object.fromEntries(bots.map((b, i) => [b.id, { ...botAgent(b), heartbeatPrompt: beats[i] || null, pinned: pinned.has(b.id) }]));
 }
 
 // ---- PandaCode conversations in SwarmClaw's chat shape (an agent's chat is its bot's own thread) ----

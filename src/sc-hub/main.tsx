@@ -3,6 +3,9 @@
 import { createRoot } from 'react-dom/client';
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { installAdapter } from './adapter';
+import { toast } from 'sonner';
+import { subscribe } from '../bridge';
+import { navigate } from './shims/next-navigation';
 import { STYLE_GUIDE_PATH, StyleGuidePage } from './style-guide-item';
 import { usePathname } from './shims/next-navigation';
 import { TooltipProvider } from '../sc/components/ui/tooltip';
@@ -13,6 +16,13 @@ import '../sc/app/globals.css';
 import './hub-look.css';
 
 installAdapter();
+// An agent reporting on its own (heartbeat, schedule): a popup in the Hub, and the full reply waits in
+// the Inbox. Jordan, 2026-11-25: "it should be a notification in the Hub, that's why it exists".
+void subscribe('bot-notification', (event) => {
+  const text = String(event?.text ?? '').trim();
+  if (!text) return;
+  toast(text.length > 300 ? `${text.slice(0, 300)}...` : text, { duration: 30_000, action: { label: 'Open', onClick: () => navigate('/inbox') } });
+});
 
 const pages = import.meta.glob<{ default: ComponentType }>('../sc/app/**/page.tsx');
 const layouts = import.meta.glob<{ default: ComponentType<{ children: ReactNode }> }>('../sc/app/*/layout.tsx');

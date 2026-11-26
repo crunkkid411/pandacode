@@ -40,7 +40,7 @@ import { CanUse, RunsOn } from '../../../sc-hub/agent-profile'
 import type { ConfigVersion } from '@/types/config-version'
 import { ProviderDiagnosticsList } from '@/components/providers/provider-diagnostics-list'
 
-const HB_PRESETS = [1800, 3600, 7200, 21600, 43200] as const
+const HB_PRESETS = [1800, 3600, 7200, 21600, 43200, 86400] as const // Hub: + once a day
 const FALLBACK_ELEVENLABS_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'
 const AUTO_SYNC_MODEL_PROVIDER_IDS = new Set<ProviderType>([
   'openai',
@@ -2067,6 +2067,25 @@ export function AgentSheet() {
           >
             <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${heartbeatEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
+        </div>
+        {/* Hub: how often and what it does, right under the switch. The text is heartbeat.md in the agent's own folder. */}
+        <div className="mt-3 rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-4">
+          <label className="block text-[14px] font-600 text-text mb-2">How often</label>
+          <select value={heartbeatIntervalSec} onChange={(e) => setHeartbeatIntervalSec(e.target.value)} className={inputClass} style={{ fontFamily: 'inherit' }}>
+            <option value="">Every hour</option>
+            {HB_PRESETS.map((preset) => (
+              <option key={preset} value={preset}>{preset === 86400 ? 'Once a day' : `Every ${formatHbDuration(preset)}`}</option>
+            ))}
+          </select>
+          <label className="block text-[14px] font-600 text-text mt-4 mb-2">What it does each time</label>
+          <textarea
+            value={heartbeatPrompt}
+            onChange={(e) => setHeartbeatPrompt(e.target.value)}
+            placeholder="Empty = a short check-in on its goals. Saved as heartbeat.md in this agent's folder."
+            rows={10}
+            className={`${inputClass} resize-y min-h-[160px]`}
+            style={{ fontFamily: 'inherit' }}
+          />
         </div>
         <div className="flex items-center justify-between gap-4 rounded-[14px] border border-white/[0.06] bg-white/[0.02] px-4 py-4 mt-3" style={{ display: 'none' }} /* Hub: bots have no dreaming */>
           <div className="min-w-0">

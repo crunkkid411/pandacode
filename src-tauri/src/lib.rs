@@ -4116,6 +4116,8 @@ pub fn run() {
                     // Agents panel: PandaCode's bots and scheduled chats.
                     bots::bots_list,
                     bots::bot_set_paused,
+                    bots::bot_heartbeat_get,
+                    bots::bot_heartbeat_set,
                     // SwarmClaw's Agents page and Org Chart: agents are PandaCode bots.
                     bots::bot_detail,
                     bots::bot_create,
@@ -4342,6 +4344,8 @@ pub fn run() {
                 bots::bot_create,
                 bots::bot_update,
                 bots::bot_set_paused,
+                    bots::bot_heartbeat_get,
+                    bots::bot_heartbeat_set,
                 bots::bot_reset,
                 bots::bot_delete,
                 bots::bot_remember,

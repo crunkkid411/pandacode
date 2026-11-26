@@ -916,3 +916,16 @@ fn bot_folder_is_the_plain_name_reuses_a_premade_folder_and_adds_id_when_taken()
     assert_eq!(second, f.root.join("video-editor-1605e86b"));
     assert_eq!(bot_folder(&f.root, "!!", "abcdef12-0000", |_| false), f.root.join("bot"));
 }
+
+#[test]
+fn heartbeat_runs_the_agents_own_heartbeat_file() {
+    let f = fixture();
+    let bot = bot(&f);
+    assert_eq!(heartbeat_prompt(&f.store, &bot), schedule::HEARTBEAT_PROMPT, "no file: the built-in check-in");
+    let path = heartbeat_file(&f.store, &bot).unwrap();
+    assert!(path.starts_with(f.root.canonicalize().unwrap()), "the file lives in the agent's own folder");
+    std::fs::write(&path, "  Check the install list and do the obvious thing.\n").unwrap();
+    assert_eq!(heartbeat_prompt(&f.store, &bot), "Check the install list and do the obvious thing.");
+    std::fs::write(&path, "  \n").unwrap();
+    assert_eq!(heartbeat_prompt(&f.store, &bot), schedule::HEARTBEAT_PROMPT, "an empty box falls back");
+}
